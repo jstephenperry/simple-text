@@ -9,6 +9,8 @@ static class Program
         var form = new MainForm();
         if (args.Length > 0 && File.Exists(args[0]))
             form.OpenFileOnLoad(args[0]);
+        else
+            form.RestoreSessionOnLoad();
         Application.Run(form);
     }
 }

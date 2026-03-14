@@ -1,0 +1,76 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ae="clr-namespace:AvaloniaEdit;assembly=AvaloniaEdit"
+        x:Class="SimpleText.Avalonia.Views.MainWindow"
+        Title="Untitled - SimpleText"
+        Width="950" Height="620"
+        MinWidth="400" MinHeight="300">
+
+  <DockPanel>
+    <!-- Menu Bar -->
+    <Menu DockPanel.Dock="Top">
+      <MenuItem Header="_File">
+        <MenuItem x:Name="NewMenuItem" Header="_New" InputGesture="Ctrl+N" />
+        <MenuItem x:Name="NewFromTemplateMenu" Header="New from _Template" />
+        <MenuItem x:Name="OpenMenuItem" Header="_Open..." InputGesture="Ctrl+O" />
+        <Separator />
+        <MenuItem x:Name="SaveMenuItem" Header="_Save" InputGesture="Ctrl+S" />
+        <MenuItem x:Name="SaveAsMenuItem" Header="Save _As..." InputGesture="Ctrl+Shift+S" />
+        <Separator />
+        <MenuItem x:Name="CloseMenuItem" Header="_Close" InputGesture="Ctrl+W" />
+        <Separator />
+        <MenuItem x:Name="ExitMenuItem" Header="E_xit" />
+      </MenuItem>
+      <MenuItem Header="_Mode">
+        <MenuItem x:Name="ModePlainText" Header="_Plain Text" />
+        <MenuItem x:Name="ModeMarkdown" Header="_Markdown" />
+        <MenuItem x:Name="ModeAsciiDoc" Header="_AsciiDoc" />
+        <MenuItem x:Name="ModeRst" Header="_reStructuredText" />
+      </MenuItem>
+      <MenuItem Header="_View">
+        <MenuItem Header="_Theme">
+          <MenuItem x:Name="ThemeSystem" Header="Follow _System" />
+          <MenuItem x:Name="ThemeLight" Header="_Light" />
+          <MenuItem x:Name="ThemeDark" Header="_Dark" />
+        </MenuItem>
+      </MenuItem>
+    </Menu>
+
+    <!-- Find Bar (hidden by default) -->
+    <Border x:Name="FindBar" DockPanel.Dock="Top" IsVisible="False"
+            Padding="8,4"
+            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <TextBlock Text="Find:" VerticalAlignment="Center" />
+        <TextBox x:Name="FindTextBox" Width="260" />
+        <Button x:Name="FindNextButton" Content="Next" />
+        <Button x:Name="FindPrevButton" Content="Prev" />
+        <Button x:Name="FindCloseButton" Content="X" Width="32" />
+      </StackPanel>
+    </Border>
+
+    <!-- Status Bar -->
+    <Border DockPanel.Dock="Bottom" Padding="10,4"
+            Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+      <Grid ColumnDefinitions="120,*,110,60">
+        <TextBlock x:Name="StatusLineCol" Grid.Column="0" Text="Ln 1, Col 1"
+                   FontSize="12" VerticalAlignment="Center" />
+        <TextBlock x:Name="StatusFileName" Grid.Column="1" Text="Untitled"
+                   FontSize="12" VerticalAlignment="Center" />
+        <TextBlock x:Name="StatusFileType" Grid.Column="2" Text="Plain Text"
+                   FontSize="12" VerticalAlignment="Center" TextAlignment="Center" />
+        <TextBlock x:Name="StatusEncoding" Grid.Column="3" Text="UTF-8"
+                   FontSize="12" VerticalAlignment="Center" TextAlignment="Right" />
+      </Grid>
+    </Border>
+
+    <!-- Editor -->
+    <ae:TextEditor x:Name="Editor"
+                   FontFamily="Cascadia Mono, JetBrains Mono, Consolas, monospace"
+                   FontSize="14"
+                   ShowLineNumbers="True"
+                   WordWrap="False"
+                   HorizontalScrollBarVisibility="Auto"
+                   VerticalScrollBarVisibility="Auto" />
+  </DockPanel>
+</Window>

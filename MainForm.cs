@@ -1,5 +1,10 @@
-using System.Runtime.InteropServices;
 using System.Text;
+using SimpleText.Core;
+using SimpleText.Core.FileTypes;
+using SimpleText.Core.Search;
+using SimpleText.Core.Session;
+using SimpleText.Core.Templates;
+using SimpleText.Highlighting;
 
 namespace SimpleText;
 
@@ -8,6 +13,12 @@ public partial class MainForm : Form
     private string? _currentFilePath;
     private bool _isDirty;
     private string? _pendingOpenFile;
+    private bool _pendingSessionRestore;
+    private string? _originalFileHash;
+    private bool _sessionDirty;
+    private System.Windows.Forms.Timer _sessionTimer = null!;
+    private HighlightingManager _highlightingManager = null!;
+    private string? _currentMode;
 
     public MainForm()
     {
@@ -17,6 +28,7 @@ public partial class MainForm : Form
     }
 
     public void OpenFileOnLoad(string path) => _pendingOpenFile = path;
+    public void RestoreSessionOnLoad() => _pendingSessionRestore = true;
 
     private void WireEvents()
     {
@@ -25,6 +37,8 @@ public partial class MainForm : Form
         {
             if (_pendingOpenFile != null)
                 OpenFile(_pendingOpenFile);
+            else if (_pendingSessionRestore)
+                RestoreSession();
         };
         FormClosing += OnFormClosing;
         DragEnter += (_, e) =>
@@ -40,9 +54,11 @@ public partial class MainForm : Form
 
         // Menu events
         _newMenuItem.Click += (_, _) => NewFile();
+        BuildTemplateMenu();
         _openMenuItem.Click += (_, _) => OpenFileDialog();
         _saveMenuItem.Click += (_, _) => SaveFile();
         _saveAsMenuItem.Click += (_, _) => SaveFileAs();
+        _closeMenuItem.Click += (_, _) => CloseFile();
         _exitMenuItem.Click += (_, _) => Close();
 
         // Editor events
@@ -59,6 +75,27 @@ public partial class MainForm : Form
         // Keyboard shortcuts not handled by menu
         KeyPreview = true;
         KeyDown += OnMainKeyDown;
+
+        // Mode menu events
+        _modePlainText.Click += (_, _) => SetMode(null);
+        _modeMarkdown.Click += (_, _) => SetMode(TextModes.Markdown);
+        _modeAsciiDoc.Click += (_, _) => SetMode(TextModes.AsciiDoc);
+        _modeRst.Click += (_, _) => SetMode(TextModes.ReStructuredText);
+
+        // Highlighting manager
+        _highlightingManager = new HighlightingManager(_editor);
+
+        // Session auto-save timer (5 seconds, crash protection)
+        _sessionTimer = new System.Windows.Forms.Timer { Interval = 5000 };
+        _sessionTimer.Tick += (_, _) =>
+        {
+            if (_sessionDirty)
+            {
+                SaveSession();
+                _sessionDirty = false;
+            }
+        };
+        _sessionTimer.Start();
     }
 
     // --- File Operations ---
@@ -68,9 +105,56 @@ public partial class MainForm : Form
         if (!PromptSaveIfDirty()) return;
         _editor.Clear();
         _currentFilePath = null;
+        _originalFileHash = null;
         SetDirty(false);
         UpdateTitle();
         UpdateStatusBar();
+        SetMode(null);
+    }
+
+    private void CloseFile()
+    {
+        if (!PromptSaveIfDirty()) return;
+        _editor.Clear();
+        _currentFilePath = null;
+        _originalFileHash = null;
+        SetDirty(false);
+        UpdateTitle();
+        UpdateStatusBar();
+        SetMode(null);
+    }
+
+    private void BuildTemplateMenu()
+    {
+        string? lastCategory = null;
+        foreach (var template in DocumentTemplates.All)
+        {
+            var category = template.Name.Split('—')[0].Trim();
+            if (lastCategory != null && category != lastCategory)
+                _newFromTemplateMenu.DropDownItems.Add(new ToolStripSeparator());
+            lastCategory = category;
+
+            var item = new ToolStripMenuItem(template.Name.Replace("—", "-"));
+            item.Click += (_, _) => ApplyTemplate(template);
+            _newFromTemplateMenu.DropDownItems.Add(item);
+        }
+    }
+
+    private void ApplyTemplate(DocumentTemplate template)
+    {
+        if (!PromptSaveIfDirty()) return;
+        _editor.TextChanged -= OnTextChanged;
+        _editor.Text = template.Content;
+        _editor.TextChanged += OnTextChanged;
+        _currentFilePath = null;
+        _originalFileHash = null;
+        SetDirty(true);
+        UpdateTitle();
+        UpdateStatusBar();
+        _lineNumberPanel.UpdateWidth();
+        _lineNumberPanel.Invalidate();
+        SetMode(template.Mode);
+        _editor.SelectionStart = 0;
     }
 
     private void OpenFileDialog()
@@ -78,8 +162,8 @@ public partial class MainForm : Form
         if (!PromptSaveIfDirty()) return;
         using var dlg = new OpenFileDialog
         {
-            Filter = "Text Files (*.txt)|*.txt|All Files (*.*)|*.*",
-            FilterIndex = 2
+            Filter = SupportedFileTypes.BuildWinFormsFilter(),
+            FilterIndex = 5
         };
         if (dlg.ShowDialog() == DialogResult.OK)
             OpenFile(dlg.FileName);
@@ -93,12 +177,17 @@ public partial class MainForm : Form
             _editor.Text = File.ReadAllText(path, Encoding.UTF8);
             _editor.TextChanged += OnTextChanged;
             _currentFilePath = path;
+            _originalFileHash = SessionManager.ComputeFileHash(path);
             SetDirty(false);
             UpdateTitle();
             UpdateStatusBar();
             _lineNumberPanel.UpdateWidth();
             _lineNumberPanel.Invalidate();
             _editor.SelectionStart = 0;
+            var detectedMode = _highlightingManager.SetFilePath(_currentFilePath);
+            _currentMode = detectedMode;
+            UpdateModeMenuChecks();
+            UpdateFileTypeStatus();
         }
         catch (Exception ex)
         {
@@ -119,8 +208,8 @@ public partial class MainForm : Form
     {
         using var dlg = new SaveFileDialog
         {
-            Filter = "Text Files (*.txt)|*.txt|All Files (*.*)|*.*",
-            FilterIndex = 2
+            Filter = SupportedFileTypes.BuildWinFormsFilter(),
+            FilterIndex = 5
         };
         if (_currentFilePath != null)
         {
@@ -131,6 +220,10 @@ public partial class MainForm : Form
         {
             _currentFilePath = dlg.FileName;
             WriteFile(_currentFilePath);
+            var detectedMode = _highlightingManager.SetFilePath(_currentFilePath);
+            _currentMode = detectedMode;
+            UpdateModeMenuChecks();
+            UpdateFileTypeStatus();
         }
     }
 
@@ -139,6 +232,7 @@ public partial class MainForm : Form
         try
         {
             File.WriteAllText(path, _editor.Text, new UTF8Encoding(false));
+            _originalFileHash = SessionManager.ComputeFileHash(path);
             SetDirty(false);
             UpdateTitle();
         }
@@ -158,6 +252,95 @@ public partial class MainForm : Form
         if (result == DialogResult.Cancel) return false;
         if (result == DialogResult.Yes) SaveFile();
         return true;
+    }
+
+    // --- Session Persistence ---
+
+    private void SaveSession()
+    {
+        var data = new SessionData
+        {
+            FilePath = _currentFilePath,
+            Content = _editor.Text,
+            CursorPosition = _editor.SelectionStart,
+            IsDirty = _isDirty,
+            OriginalFileHash = _originalFileHash,
+            Mode = _currentMode
+        };
+        SessionManager.Save(data);
+    }
+
+    private void RestoreSession()
+    {
+        var data = SessionManager.Load();
+        if (data == null) return;
+
+        // Check for external modification of the file
+        if (data.FilePath != null && data.IsDirty && File.Exists(data.FilePath))
+        {
+            var currentHash = SessionManager.ComputeFileHash(data.FilePath);
+            if (data.OriginalFileHash != null && currentHash != data.OriginalFileHash)
+            {
+                var result = MessageBox.Show(
+                    $"The file \"{Path.GetFileName(data.FilePath)}\" was modified outside SimpleText.\n\n" +
+                    "Do you want to reload the file from disk (losing your unsaved changes) " +
+                    "or keep your session version?",
+                    "External Modification Detected",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+
+                if (result == DialogResult.Yes)
+                {
+                    // Reload from disk
+                    OpenFile(data.FilePath);
+                    return;
+                }
+            }
+        }
+
+        // Restore session state
+        _editor.TextChanged -= OnTextChanged;
+        _editor.Text = data.Content ?? "";
+        _editor.TextChanged += OnTextChanged;
+        _currentFilePath = data.FilePath;
+        _originalFileHash = data.OriginalFileHash;
+
+        if (data.CursorPosition <= _editor.TextLength)
+            _editor.SelectionStart = data.CursorPosition;
+
+        SetDirty(data.IsDirty);
+        UpdateTitle();
+        UpdateStatusBar();
+        _lineNumberPanel.UpdateWidth();
+        _lineNumberPanel.Invalidate();
+
+        // Restore mode: use saved mode if present, otherwise auto-detect from file path
+        if (data.Mode != null)
+            SetMode(data.Mode);
+        else
+        {
+            var detectedMode = _highlightingManager.SetFilePath(_currentFilePath);
+            _currentMode = detectedMode;
+            UpdateModeMenuChecks();
+            UpdateFileTypeStatus();
+        }
+    }
+
+    // --- Mode Selection ---
+
+    private void SetMode(string? mode)
+    {
+        _currentMode = mode;
+        _highlightingManager.SetMode(mode);
+        UpdateModeMenuChecks();
+        UpdateFileTypeStatus();
+    }
+
+    private void UpdateModeMenuChecks()
+    {
+        _modePlainText.Checked = _currentMode == null;
+        _modeMarkdown.Checked = _currentMode == TextModes.Markdown;
+        _modeAsciiDoc.Checked = _currentMode == TextModes.AsciiDoc;
+        _modeRst.Checked = _currentMode == TextModes.ReStructuredText;
     }
 
     // --- UI Updates ---
@@ -185,17 +368,24 @@ public partial class MainForm : Form
         _statusFileName.Text = _currentFilePath != null ? Path.GetFileName(_currentFilePath) : "Untitled";
     }
 
+    private void UpdateFileTypeStatus()
+    {
+        _statusFileType.Text = _highlightingManager.FileTypeName;
+    }
+
     private void OnTextChanged(object? sender, EventArgs e)
     {
         if (!_isDirty) SetDirty(true);
+        _sessionDirty = true;
         _lineNumberPanel.UpdateWidth();
         _lineNumberPanel.Invalidate();
     }
 
     private void OnFormClosing(object? sender, FormClosingEventArgs e)
     {
-        if (!PromptSaveIfDirty())
-            e.Cancel = true;
+        // Notepad++ behavior: always save session, no "save changes?" prompt on close
+        _sessionTimer.Stop();
+        SaveSession();
     }
 
     // --- Find Bar ---
@@ -218,18 +408,14 @@ public partial class MainForm : Form
     private void FindNext()
     {
         var term = _findTextBox.Text;
-        if (string.IsNullOrEmpty(term)) return;
-
         int startIndex = _editor.SelectionStart + _editor.SelectionLength;
-        int foundIndex = _editor.Text.IndexOf(term, startIndex, StringComparison.OrdinalIgnoreCase);
-        if (foundIndex < 0)
-            foundIndex = _editor.Text.IndexOf(term, 0, StringComparison.OrdinalIgnoreCase);
-        if (foundIndex >= 0)
+        var found = TextFinder.FindNext(_editor.Text, term, startIndex);
+        if (found is { } index)
         {
-            _editor.Select(foundIndex, term.Length);
+            _editor.Select(index, term.Length);
             _editor.ScrollToCaret();
         }
-        else
+        else if (!string.IsNullOrEmpty(term))
         {
             MessageBox.Show($"Cannot find \"{term}\"", "Find",
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -239,19 +425,14 @@ public partial class MainForm : Form
     private void FindPrevious()
     {
         var term = _findTextBox.Text;
-        if (string.IsNullOrEmpty(term)) return;
-
-        int startIndex = _editor.SelectionStart - 1;
-        if (startIndex < 0) startIndex = _editor.Text.Length - 1;
-        int foundIndex = _editor.Text.LastIndexOf(term, startIndex, StringComparison.OrdinalIgnoreCase);
-        if (foundIndex < 0)
-            foundIndex = _editor.Text.LastIndexOf(term, _editor.Text.Length - 1, StringComparison.OrdinalIgnoreCase);
-        if (foundIndex >= 0)
+        int startIndex = _editor.SelectionStart;
+        var found = TextFinder.FindPrevious(_editor.Text, term, startIndex);
+        if (found is { } index)
         {
-            _editor.Select(foundIndex, term.Length);
+            _editor.Select(index, term.Length);
             _editor.ScrollToCaret();
         }
-        else
+        else if (!string.IsNullOrEmpty(term))
         {
             MessageBox.Show($"Cannot find \"{term}\"", "Find",
                 MessageBoxButtons.OK, MessageBoxIcon.Information);

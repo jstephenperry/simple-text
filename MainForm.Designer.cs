@@ -9,14 +9,23 @@ partial class MainForm
     private MenuStrip _menuStrip = null!;
     private ToolStripMenuItem _fileMenu = null!;
     private ToolStripMenuItem _newMenuItem = null!;
+    private ToolStripMenuItem _newFromTemplateMenu = null!;
     private ToolStripMenuItem _openMenuItem = null!;
     private ToolStripMenuItem _saveMenuItem = null!;
     private ToolStripMenuItem _saveAsMenuItem = null!;
+    private ToolStripMenuItem _closeMenuItem = null!;
     private ToolStripMenuItem _exitMenuItem = null!;
+
+    private ToolStripMenuItem _modeMenu = null!;
+    private ToolStripMenuItem _modePlainText = null!;
+    private ToolStripMenuItem _modeMarkdown = null!;
+    private ToolStripMenuItem _modeAsciiDoc = null!;
+    private ToolStripMenuItem _modeRst = null!;
 
     private StatusStrip _statusStrip = null!;
     private ToolStripStatusLabel _statusLineCol = null!;
     private ToolStripStatusLabel _statusFileName = null!;
+    private ToolStripStatusLabel _statusFileType = null!;
     private ToolStripStatusLabel _statusEncoding = null!;
 
     private Panel _editorPanel = null!;
@@ -45,27 +54,44 @@ partial class MainForm
         _menuStrip = new MenuStrip();
         _fileMenu = new ToolStripMenuItem("&File");
         _newMenuItem = new ToolStripMenuItem("&New", null, null, Keys.Control | Keys.N);
+        _newFromTemplateMenu = new ToolStripMenuItem("New from &Template");
         _openMenuItem = new ToolStripMenuItem("&Open...", null, null, Keys.Control | Keys.O);
         _saveMenuItem = new ToolStripMenuItem("&Save", null, null, Keys.Control | Keys.S);
         _saveAsMenuItem = new ToolStripMenuItem("Save &As...", null, null, Keys.Control | Keys.Shift | Keys.S);
+        _closeMenuItem = new ToolStripMenuItem("&Close", null, null, Keys.Control | Keys.W);
         _exitMenuItem = new ToolStripMenuItem("E&xit");
         _fileMenu.DropDownItems.AddRange(new ToolStripItem[]
         {
-            _newMenuItem, _openMenuItem,
+            _newMenuItem, _newFromTemplateMenu, _openMenuItem,
             new ToolStripSeparator(),
             _saveMenuItem, _saveAsMenuItem,
             new ToolStripSeparator(),
+            _closeMenuItem,
+            new ToolStripSeparator(),
             _exitMenuItem
         });
+        // --- Mode Menu ---
+        _modeMenu = new ToolStripMenuItem("&Mode");
+        _modePlainText = new ToolStripMenuItem("&Plain Text") { Checked = true };
+        _modeMarkdown = new ToolStripMenuItem("&Markdown");
+        _modeAsciiDoc = new ToolStripMenuItem("&AsciiDoc");
+        _modeRst = new ToolStripMenuItem("&reStructuredText");
+        _modeMenu.DropDownItems.AddRange(new ToolStripItem[]
+        {
+            _modePlainText, _modeMarkdown, _modeAsciiDoc, _modeRst
+        });
+
         _menuStrip.Items.Add(_fileMenu);
+        _menuStrip.Items.Add(_modeMenu);
         _menuStrip.Dock = DockStyle.Top;
 
         // --- StatusStrip ---
         _statusStrip = new StatusStrip();
         _statusLineCol = new ToolStripStatusLabel("Ln 1, Col 1") { AutoSize = false, Width = 120, TextAlign = ContentAlignment.MiddleLeft };
         _statusFileName = new ToolStripStatusLabel("Untitled") { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
+        _statusFileType = new ToolStripStatusLabel("Plain Text") { AutoSize = false, Width = 100, TextAlign = ContentAlignment.MiddleCenter };
         _statusEncoding = new ToolStripStatusLabel("UTF-8") { AutoSize = false, Width = 60, TextAlign = ContentAlignment.MiddleRight };
-        _statusStrip.Items.AddRange(new ToolStripItem[] { _statusLineCol, _statusFileName, _statusEncoding });
+        _statusStrip.Items.AddRange(new ToolStripItem[] { _statusLineCol, _statusFileName, _statusFileType, _statusEncoding });
         _statusStrip.Dock = DockStyle.Bottom;
 
         // --- Find Bar ---

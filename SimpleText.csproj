@@ -2,10 +2,23 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="SimpleText.Core\**" />
+    <Compile Remove="SimpleText.Avalonia\**" />
+    <EmbeddedResource Remove="SimpleText.Core\**" />
+    <EmbeddedResource Remove="SimpleText.Avalonia\**" />
+    <None Remove="SimpleText.Core\**" />
+    <None Remove="SimpleText.Avalonia\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="SimpleText.Core\SimpleText.Core.csproj" />
+  </ItemGroup>
 
 </Project>
