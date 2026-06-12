@@ -421,6 +421,191 @@ public static class DocumentTemplates
 
         """;
 
+    // --- Software Engineering ---
+
+    private const string ReadmeMarkdown =
+        """
+        # Project Name
+
+        A short description of what this project does and who it is for.
+
+        ## Features
+
+        -
+        -
+        -
+
+        ## Getting Started
+
+        ### Installation
+
+        1.
+        2.
+
+        ## Usage
+
+
+
+        ## Contributing
+
+        -
+
+        ## License
+
+        -
+        """;
+
+    private const string ChangelogMarkdown =
+        """
+        # Changelog
+
+        All notable changes to this project will be documented in this file.
+
+        The format is based on [Keep a Changelog](https://keepachangelog.com/).
+
+        ## [Unreleased]
+
+        ### Added
+
+        -
+
+        ### Changed
+
+        -
+
+        ### Fixed
+
+        -
+
+        ## [1.0.0] - YYYY-MM-DD
+
+        ### Added
+
+        - Initial release.
+        """;
+
+    private const string AdrMarkdown =
+        """
+        # ADR-0001: Title
+
+        ## Status
+
+        Proposed
+
+        ## Context
+
+
+
+        ## Decision
+
+
+
+        ## Consequences
+
+        """;
+
+    private const string BugReportMarkdown =
+        """
+        # Bug Report
+
+        ## Summary
+
+
+
+        ## Environment
+
+        - **OS:**
+        - **Version:**
+        - **Build:**
+
+        ## Steps to Reproduce
+
+        1.
+        2.
+        3.
+
+        ## Expected Behavior
+
+
+
+        ## Actual Behavior
+
+
+
+        ## Logs / Screenshots
+
+
+
+        ## Severity
+
+        Low / Medium / High / Critical
+        """;
+
+    private const string PullRequestMarkdown =
+        """
+        # Pull Request
+
+        ## Summary
+
+
+
+        ## Changes
+
+        -
+        -
+
+        ## Motivation
+
+
+
+        ## Testing
+
+
+
+        ## Checklist
+
+        - [ ] Tests pass
+        - [ ] Documentation updated
+        - [ ] Code reviewed
+        """;
+
+    private const string DesignDocMarkdown =
+        """
+        # Design Doc
+
+        ## Overview
+
+
+
+        ## Goals
+
+        -
+
+        ## Non-Goals
+
+        -
+
+        ## Proposed Design
+
+
+
+        ## Alternatives Considered
+
+
+
+        ## Security / Privacy Considerations
+
+
+
+        ## Rollout Plan
+
+
+
+        ## Open Questions
+
+        -
+        """;
+
     public static IReadOnlyList<DocumentTemplate> All { get; } = new[]
     {
         new DocumentTemplate("General Notetaking — Plain Text", null, NotePlain),
@@ -437,5 +622,12 @@ public static class DocumentTemplates
         new DocumentTemplate("Development Proposal — Markdown", TextModes.Markdown, ProposalMarkdown),
         new DocumentTemplate("Development Proposal — reStructuredText", TextModes.ReStructuredText, ProposalRst),
         new DocumentTemplate("Development Proposal — AsciiDoc", TextModes.AsciiDoc, ProposalAsciiDoc),
+
+        new DocumentTemplate("Software Engineering — README", TextModes.Markdown, ReadmeMarkdown),
+        new DocumentTemplate("Software Engineering — Changelog", TextModes.Markdown, ChangelogMarkdown),
+        new DocumentTemplate("Software Engineering — Architecture Decision Record", TextModes.Markdown, AdrMarkdown),
+        new DocumentTemplate("Software Engineering — Bug Report", TextModes.Markdown, BugReportMarkdown),
+        new DocumentTemplate("Software Engineering — Pull Request", TextModes.Markdown, PullRequestMarkdown),
+        new DocumentTemplate("Software Engineering — Design Doc", TextModes.Markdown, DesignDocMarkdown),
     };
 }

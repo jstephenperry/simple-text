@@ -5,16 +5,18 @@ A lightweight text editor for plain text and lightweight markup formats (Markdow
 ## What it does
 
 - Edit plain text files with line numbers and find/replace
-- Syntax highlighting for Markdown, AsciiDoc, and reStructuredText
-- Document templates for common formats (notes, technical reports, proposals)
+- Semantic syntax highlighting for Markdown ([Markdig](https://github.com/xoofx/markdig) AST), AsciiDoc, and reStructuredText (TextMate grammars via [TextMateSharp](https://github.com/danipen/TextMateSharp))
+- Document templates for productivity (notes, technical reports, proposals) and software engineering (README, changelog, ADR, bug report, pull request, design doc)
 - Session persistence — picks up where you left off, even after a crash
 - Drag-and-drop file opening
 
 ## Two UIs, one core
 
-- **SimpleText** — Windows-only, WinForms
-- **SimpleText.Avalonia** — Cross-platform, built on [Avalonia UI](https://avaloniaui.net/) with [AvaloniaEdit](https://github.com/AvaloniaUI/AvaloniaEdit) and TextMate grammars
-- **SimpleText.Core** — Shared library (session management, file types, search, templates)
+- **SimpleText.WinUI** — Windows-native [WinUI 3](https://learn.microsoft.com/windows/apps/winui/winui3/) (Windows App SDK)
+- **SimpleText.Avalonia** — Cross-platform (Windows/macOS/Linux), built on [Avalonia UI](https://avaloniaui.net/) with [AvaloniaEdit](https://github.com/AvaloniaUI/AvaloniaEdit) and TextMate grammars
+
+Both frontends share the same feature set: Notepad++-style tabbed editing, multi-tab session restore, light/dark/system themes, word wrap, and zoom.
+- **SimpleText.Core** — Shared library (session management, file types, search, templates, and the semantic highlighting engine: Markdig + TextMate span parsers behind a UI-agnostic `ISpanHighlighter`)
 
 ## Building
 
@@ -24,9 +26,10 @@ Requires .NET 10 SDK.
 dotnet build SimpleText.sln
 ```
 
-Run the WinForms version (Windows only):
+Run the WinUI 3 version (Windows only):
 ```
-dotnet run --project SimpleText.csproj
+dotnet build SimpleText.WinUI/SimpleText.WinUI.csproj
+SimpleText.WinUI/bin/x64/Debug/net10.0-windows10.0.19041.0/win-x64/SimpleText.WinUI.exe
 ```
 
 Run the Avalonia version (cross-platform):

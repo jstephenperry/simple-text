@@ -7,4 +7,14 @@
     <RootNamespace>SimpleText.Core</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Markdig" Version="1.2.0" />
+    <PackageReference Include="TextMateSharp" Version="2.0.4" />
+    <PackageReference Include="TextMateSharp.Grammars" Version="2.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Highlighting\Grammars\rst.tmLanguage.json" />
+  </ItemGroup>
+
 </Project>

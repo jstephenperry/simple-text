@@ -16,15 +16,11 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.12" />
     <PackageReference Include="Avalonia.AvaloniaEdit" Version="11.4.1" />
     <PackageReference Include="AvaloniaEdit.TextMate" Version="11.4.1" />
-    <PackageReference Include="TextMateSharp.Grammars" Version="2.0.3" />
+    <PackageReference Include="TextMateSharp.Grammars" Version="2.0.4" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\SimpleText.Core\SimpleText.Core.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="Grammars\*.json" />
   </ItemGroup>
 
 </Project>
