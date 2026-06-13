@@ -36,6 +36,7 @@ public sealed partial class MainWindow : Window
 
         Title = "Untitled - SimpleText";
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1100, 700));
+        TrySetWindowIcon();
 
         BuildTemplateMenu();
         AddOemZoomAccelerators();
@@ -846,6 +847,20 @@ public sealed partial class MainWindow : Window
     {
         SessionInfoBar.Message = message;
         SessionInfoBar.IsOpen = true;
+    }
+
+    private void TrySetWindowIcon()
+    {
+        try
+        {
+            var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico");
+            if (File.Exists(iconPath))
+                AppWindow.SetIcon(iconPath);
+        }
+        catch
+        {
+            // Icon is cosmetic; never let it block window creation.
+        }
     }
 
     private void OnFirstActivated(object sender, WindowActivatedEventArgs args)
