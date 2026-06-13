@@ -14,9 +14,9 @@ A lightweight text editor for plain text and lightweight markup formats (Markdow
 
 - **SimpleText.WinUI** — Windows-native [WinUI 3](https://learn.microsoft.com/windows/apps/winui/winui3/) (Windows App SDK)
 - **SimpleText.Avalonia** — Cross-platform (Windows/macOS/Linux), built on [Avalonia UI](https://avaloniaui.net/) with [AvaloniaEdit](https://github.com/AvaloniaUI/AvaloniaEdit) and TextMate grammars
+- **SimpleText.Core** — Shared library (session management, file types, search, templates, and the semantic highlighting engine: Markdig + TextMate span parsers behind a UI-agnostic `ISpanHighlighter`)
 
 Both frontends share the same feature set: Notepad++-style tabbed editing, multi-tab session restore, light/dark/system themes, word wrap, and zoom.
-- **SimpleText.Core** — Shared library (session management, file types, search, templates, and the semantic highlighting engine: Markdig + TextMate span parsers behind a UI-agnostic `ISpanHighlighter`)
 
 ## Building
 
@@ -40,3 +40,11 @@ dotnet run --project SimpleText.Avalonia/SimpleText.Avalonia.csproj
 ## Disclaimer
 
 This is a pet project. It works on my machine. There are no tests, no CI, and no guarantees. Use at your own risk.
+
+## AI Disclosure
+
+A large portion of this project — the WinUI 3 and Avalonia frontends, the semantic
+highlighting integration (Markdig + TextMate), the document templates, and the application
+icon — was written with substantial assistance from AI (Anthropic's Claude, via Claude Code).
+The code builds and has been exercised by hand, but AI-generated code can carry subtle bugs or
+non-idiomatic patterns; review it before depending on it for anything important.
