@@ -7,6 +7,7 @@ A lightweight text editor for plain text and lightweight markup formats (Markdow
 - Edit plain text files with line numbers and find/replace
 - Semantic syntax highlighting for Markdown ([Markdig](https://github.com/xoofx/markdig) AST), AsciiDoc, and reStructuredText (TextMate grammars via [TextMateSharp](https://github.com/danipen/TextMateSharp))
 - Document templates for productivity (notes, technical reports, proposals) and software engineering (README, changelog, ADR, bug report, pull request, design doc)
+- User-supplied templates: drop a text file in `%LocalAppData%/SimpleText/Templates/` (or the platform equivalent) and it auto-registers in the **New from Template** menu — no restart needed. The file name becomes the template name, an immediate sub-folder becomes its category, and the extension (`.md`, `.rst`, `.adoc`, `.txt`, …) sets the editor mode
 - Session persistence — picks up where you left off, even after a crash
 - Drag-and-drop file opening
 

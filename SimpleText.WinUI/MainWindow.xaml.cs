@@ -39,6 +39,7 @@ public sealed partial class MainWindow : Window
         TrySetWindowIcon();
 
         BuildTemplateMenu();
+        TemplateCatalog.Shared.Changed += OnTemplatesChanged;
         AddOemZoomAccelerators();
 
         RootGrid.ActualThemeChanged += (_, _) => ApplyEditorThemeToAllPanes();
@@ -416,7 +417,8 @@ public sealed partial class MainWindow : Window
 
     private void BuildTemplateMenu()
     {
-        foreach (var group in DocumentTemplates.All.GroupBy(t => t.Category))
+        NewFromTemplateMenu.Items.Clear();
+        foreach (var group in TemplateCatalog.Shared.All.GroupBy(t => t.Category))
         {
             var categoryMenu = new MenuFlyoutSubItem { Text = group.Key };
             foreach (var template in group)
@@ -428,6 +430,9 @@ public sealed partial class MainWindow : Window
             NewFromTemplateMenu.Items.Add(categoryMenu);
         }
     }
+
+    private void OnTemplatesChanged(object? sender, EventArgs e)
+        => DispatcherQueue.TryEnqueue(BuildTemplateMenu);
 
     private void ApplyTemplate(DocumentTemplate template)
     {
@@ -866,6 +871,7 @@ public sealed partial class MainWindow : Window
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
         // Notepad++ behavior: no save prompts on exit — the session preserves unsaved work.
+        TemplateCatalog.Shared.Changed -= OnTemplatesChanged;
         _sessionTimer?.Stop();
         SaveWorkspaceSession();
     }

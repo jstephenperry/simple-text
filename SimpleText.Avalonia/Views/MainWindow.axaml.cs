@@ -199,6 +199,7 @@ public partial class MainWindow : Window
         // File menu
         NewMenuItem.Click += (_, _) => AddNewTab();
         BuildTemplateMenu();
+        TemplateCatalog.Shared.Changed += OnTemplatesChanged;
         OpenMenuItem.Click += async (_, _) => await OpenFileDialogAsync();
         SaveMenuItem.Click += async (_, _) => await SaveActiveAsync();
         SaveAsMenuItem.Click += async (_, _) => await SaveActiveAsAsync();
@@ -489,7 +490,8 @@ public partial class MainWindow : Window
 
     private void BuildTemplateMenu()
     {
-        foreach (var group in DocumentTemplates.All.GroupBy(t => t.Category))
+        NewFromTemplateMenu.Items.Clear();
+        foreach (var group in TemplateCatalog.Shared.All.GroupBy(t => t.Category))
         {
             var categoryMenu = new MenuItem { Header = group.Key };
             foreach (var template in group)
@@ -502,6 +504,9 @@ public partial class MainWindow : Window
             NewFromTemplateMenu.Items.Add(categoryMenu);
         }
     }
+
+    private void OnTemplatesChanged(object? sender, EventArgs e)
+        => Dispatcher.UIThread.Post(BuildTemplateMenu);
 
     private void ApplyTemplate(DocumentTemplate template)
     {
@@ -702,6 +707,7 @@ public partial class MainWindow : Window
     private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
         // Notepad++ behavior: no save prompts on exit — the session preserves unsaved work.
+        TemplateCatalog.Shared.Changed -= OnTemplatesChanged;
         _sessionTimer.Stop();
         SaveWorkspaceSession();
     }

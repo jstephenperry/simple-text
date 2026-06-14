@@ -18,7 +18,9 @@ public sealed record DocumentTemplate(string Category, string Variant, string? M
 /// The built-in template catalog, loaded from the embedded manifest
 /// (<c>Templates/templates.json</c>) and its companion content files under
 /// <c>Templates/Content/</c>. Templates are data, not code: to add, edit, or
-/// reorder one, change the manifest and content files — no code changes needed.
+/// reorder a built-in, change the manifest and content files — no code changes
+/// needed. For user-supplied templates discovered at runtime, see
+/// <see cref="TemplateCatalog"/>.
 /// </summary>
 public static class DocumentTemplates
 {
@@ -31,7 +33,8 @@ public static class DocumentTemplates
         ReadCommentHandling = JsonCommentHandling.Skip,
     };
 
-    public static IReadOnlyList<DocumentTemplate> All { get; } = Load();
+    /// <summary>The templates shipped with the application, embedded at build time.</summary>
+    public static IReadOnlyList<DocumentTemplate> BuiltIns { get; } = Load();
 
     private static IReadOnlyList<DocumentTemplate> Load()
     {
@@ -84,7 +87,7 @@ public static class DocumentTemplates
     };
 
     /// <summary>Drop the single conventional end-of-file newline so applied templates have no trailing blank line.</summary>
-    private static string StripTrailingNewline(string text)
+    internal static string StripTrailingNewline(string text)
     {
         if (text.EndsWith('\n'))
             text = text[..^1];
