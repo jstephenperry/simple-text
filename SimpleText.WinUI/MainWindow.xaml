@@ -91,6 +91,10 @@
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
             </MenuBarItem>
+
+            <MenuBarItem Title="Help">
+                <MenuFlyoutItem Text="Open Templates Folder" Click="OnOpenTemplatesFolderClick"/>
+            </MenuBarItem>
         </MenuBar>
 
         <InfoBar x:Name="SessionInfoBar"

@@ -444,6 +444,14 @@ public sealed partial class MainWindow : Window
         pane.FocusEditor();
     }
 
+    private async void OnOpenTemplatesFolderClick(object sender, RoutedEventArgs e)
+    {
+        var path = TemplateCatalog.Shared.UserTemplatesDirectory;
+        Directory.CreateDirectory(path);
+        var folder = await StorageFolder.GetFolderFromPathAsync(path);
+        await Launcher.LaunchFolderAsync(folder);
+    }
+
     // --- Mode menu ---
 
     private void OnModePlainTextClick(object sender, RoutedEventArgs e) => SetActiveMode(null);

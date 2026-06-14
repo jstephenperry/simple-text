@@ -200,6 +200,7 @@ public partial class MainWindow : Window
         NewMenuItem.Click += (_, _) => AddNewTab();
         BuildTemplateMenu();
         TemplateCatalog.Shared.Changed += OnTemplatesChanged;
+        OpenTemplatesFolderMenuItem.Click += async (_, _) => await OpenTemplatesFolderAsync();
         OpenMenuItem.Click += async (_, _) => await OpenFileDialogAsync();
         SaveMenuItem.Click += async (_, _) => await SaveActiveAsync();
         SaveAsMenuItem.Click += async (_, _) => await SaveActiveAsAsync();
@@ -507,6 +508,13 @@ public partial class MainWindow : Window
 
     private void OnTemplatesChanged(object? sender, EventArgs e)
         => Dispatcher.UIThread.Post(BuildTemplateMenu);
+
+    private async Task OpenTemplatesFolderAsync()
+    {
+        var path = TemplateCatalog.Shared.UserTemplatesDirectory;
+        Directory.CreateDirectory(path);
+        await Launcher.LaunchDirectoryInfoAsync(new DirectoryInfo(path));
+    }
 
     private void ApplyTemplate(DocumentTemplate template)
     {
