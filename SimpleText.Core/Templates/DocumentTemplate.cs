@@ -1,633 +1,112 @@
+using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace SimpleText.Core.Templates;
 
-public sealed record DocumentTemplate(string Name, string? Mode, string Content);
+/// <summary>
+/// A built-in document template. <see cref="Mode"/> is the editor mode token
+/// (see <see cref="TextModes"/>) or <c>null</c> for plain text.
+/// </summary>
+public sealed record DocumentTemplate(string Category, string Variant, string? Mode, string Content)
+{
+    /// <summary>Menu label, e.g. <c>"Technical Report — Markdown"</c>.</summary>
+    public string DisplayName => $"{Category} — {Variant}";
+}
 
+/// <summary>
+/// The built-in template catalog, loaded from the embedded manifest
+/// (<c>Templates/templates.json</c>) and its companion content files under
+/// <c>Templates/Content/</c>. Templates are data, not code: to add, edit, or
+/// reorder one, change the manifest and content files — no code changes needed.
+/// </summary>
 public static class DocumentTemplates
 {
-    // --- General Notetaking ---
+    private const string ManifestResource = "SimpleText.Core.Templates.templates.json";
+    private const string ContentResourcePrefix = "SimpleText.Core.Templates.Content.";
 
-    private const string NotePlain =
-        """
-        ================
-        Meeting Notes
-        ================
-        Date:
-        Attendees:
-
-        Agenda
-        ------
-        1.
-        2.
-        3.
-
-        Notes
-        -----
-
-
-        Action Items
-        ------------
-        [ ]
-        [ ]
-        """;
-
-    private const string NoteMarkdown =
-        """
-        # Meeting Notes
-
-        **Date:**
-        **Attendees:**
-
-        ## Agenda
-
-        1.
-        2.
-        3.
-
-        ## Notes
-
-
-
-        ## Action Items
-
-        - [ ]
-        - [ ]
-        """;
-
-    private const string NoteRst =
-        """
-        =============
-        Meeting Notes
-        =============
-
-        :Date:
-        :Attendees:
-
-        Agenda
-        ======
-
-        1.
-        2.
-        3.
-
-        Notes
-        =====
-
-
-
-        Action Items
-        ============
-
-        - [ ]
-        - [ ]
-        """;
-
-    private const string NoteAsciiDoc =
-        """
-        = Meeting Notes
-
-        Date::
-        Attendees::
-
-        == Agenda
-
-        1.
-        2.
-        3.
-
-        == Notes
-
-
-
-        == Action Items
-
-        * [ ]
-        * [ ]
-        """;
-
-    // --- Technical Report ---
-
-    private const string ReportPlain =
-        """
-        ================
-        Technical Report
-        ================
-        Title:
-        Author:
-        Date:
-        Version: 1.0
-
-        1. Summary
-        ----------
-
-
-        2. Background
-        -------------
-
-
-        3. Methodology
-        --------------
-
-
-        4. Findings
-        -----------
-
-
-        5. Recommendations
-        ------------------
-
-
-        6. Conclusion
-        -------------
-
-        """;
-
-    private const string ReportMarkdown =
-        """
-        # Technical Report
-
-        | Field   | Value |
-        |---------|-------|
-        | Title   |       |
-        | Author  |       |
-        | Date    |       |
-        | Version | 1.0   |
-
-        ## 1. Summary
-
-
-
-        ## 2. Background
-
-
-
-        ## 3. Methodology
-
-
-
-        ## 4. Findings
-
-
-
-        ## 5. Recommendations
-
-
-
-        ## 6. Conclusion
-
-        """;
-
-    private const string ReportRst =
-        """
-        ================
-        Technical Report
-        ================
-
-        :Title:
-        :Author:
-        :Date:
-        :Version: 1.0
-
-        1. Summary
-        ==========
-
-
-
-        2. Background
-        =============
-
-
-
-        3. Methodology
-        ==============
-
-
-
-        4. Findings
-        ===========
-
-
-
-        5. Recommendations
-        ==================
-
-
-
-        6. Conclusion
-        =============
-
-        """;
-
-    private const string ReportAsciiDoc =
-        """
-        = Technical Report
-        :author:
-        :revdate:
-        :revnumber: 1.0
-        :toc:
-
-        == 1. Summary
-
-
-
-        == 2. Background
-
-
-
-        == 3. Methodology
-
-
-
-        == 4. Findings
-
-
-
-        == 5. Recommendations
-
-
-
-        == 6. Conclusion
-
-        """;
-
-    // --- Development Proposal ---
-
-    private const string ProposalPlain =
-        """
-        ======================
-        Development Proposal
-        ======================
-        Title:
-        Author:
-        Date:
-        Status: Draft
-
-        1. Overview
-        -----------
-
-
-        2. Problem Statement
-        --------------------
-
-
-        3. Proposed Solution
-        --------------------
-
-
-        4. Alternatives Considered
-        --------------------------
-
-
-        5. Implementation Plan
-        ----------------------
-        Phase 1:
-        Phase 2:
-        Phase 3:
-
-        6. Risks
-        --------
-
-
-        7. Timeline
-        -----------
-
-        """;
-
-    private const string ProposalMarkdown =
-        """
-        # Development Proposal
-
-        | Field  | Value |
-        |--------|-------|
-        | Title  |       |
-        | Author |       |
-        | Date   |       |
-        | Status | Draft |
-
-        ## 1. Overview
-
-
-
-        ## 2. Problem Statement
-
-
-
-        ## 3. Proposed Solution
-
-
-
-        ## 4. Alternatives Considered
-
-
-
-        ## 5. Implementation Plan
-
-        - **Phase 1:**
-        - **Phase 2:**
-        - **Phase 3:**
-
-        ## 6. Risks
-
-
-
-        ## 7. Timeline
-
-        """;
-
-    private const string ProposalRst =
-        """
-        ======================
-        Development Proposal
-        ======================
-
-        :Title:
-        :Author:
-        :Date:
-        :Status: Draft
-
-        1. Overview
-        ===========
-
-
-
-        2. Problem Statement
-        ====================
-
-
-
-        3. Proposed Solution
-        ====================
-
-
-
-        4. Alternatives Considered
-        ==========================
-
-
-
-        5. Implementation Plan
-        ======================
-
-        - **Phase 1:**
-        - **Phase 2:**
-        - **Phase 3:**
-
-        6. Risks
-        ========
-
-
-
-        7. Timeline
-        ===========
-
-        """;
-
-    private const string ProposalAsciiDoc =
-        """
-        = Development Proposal
-        :author:
-        :revdate:
-        :status: Draft
-        :toc:
-
-        == 1. Overview
-
-
-
-        == 2. Problem Statement
-
-
-
-        == 3. Proposed Solution
-
-
-
-        == 4. Alternatives Considered
-
-
-
-        == 5. Implementation Plan
-
-        Phase 1::
-
-        Phase 2::
-
-        Phase 3::
-
-        == 6. Risks
-
-
-
-        == 7. Timeline
-
-        """;
-
-    // --- Software Engineering ---
-
-    private const string ReadmeMarkdown =
-        """
-        # Project Name
-
-        A short description of what this project does and who it is for.
-
-        ## Features
-
-        -
-        -
-        -
-
-        ## Getting Started
-
-        ### Installation
-
-        1.
-        2.
-
-        ## Usage
-
-
-
-        ## Contributing
-
-        -
-
-        ## License
-
-        -
-        """;
-
-    private const string ChangelogMarkdown =
-        """
-        # Changelog
-
-        All notable changes to this project will be documented in this file.
-
-        The format is based on [Keep a Changelog](https://keepachangelog.com/).
-
-        ## [Unreleased]
-
-        ### Added
-
-        -
-
-        ### Changed
-
-        -
-
-        ### Fixed
-
-        -
-
-        ## [1.0.0] - YYYY-MM-DD
-
-        ### Added
-
-        - Initial release.
-        """;
-
-    private const string AdrMarkdown =
-        """
-        # ADR-0001: Title
-
-        ## Status
-
-        Proposed
-
-        ## Context
-
-
-
-        ## Decision
-
-
-
-        ## Consequences
-
-        """;
-
-    private const string BugReportMarkdown =
-        """
-        # Bug Report
-
-        ## Summary
-
-
-
-        ## Environment
-
-        - **OS:**
-        - **Version:**
-        - **Build:**
-
-        ## Steps to Reproduce
-
-        1.
-        2.
-        3.
-
-        ## Expected Behavior
-
-
-
-        ## Actual Behavior
-
-
-
-        ## Logs / Screenshots
-
-
-
-        ## Severity
-
-        Low / Medium / High / Critical
-        """;
-
-    private const string PullRequestMarkdown =
-        """
-        # Pull Request
-
-        ## Summary
-
-
-
-        ## Changes
-
-        -
-        -
-
-        ## Motivation
-
-
-
-        ## Testing
-
-
-
-        ## Checklist
-
-        - [ ] Tests pass
-        - [ ] Documentation updated
-        - [ ] Code reviewed
-        """;
-
-    private const string DesignDocMarkdown =
-        """
-        # Design Doc
-
-        ## Overview
-
-
-
-        ## Goals
-
-        -
-
-        ## Non-Goals
-
-        -
-
-        ## Proposed Design
-
-
-
-        ## Alternatives Considered
-
-
-
-        ## Security / Privacy Considerations
-
-
-
-        ## Rollout Plan
-
-
-
-        ## Open Questions
-
-        -
-        """;
-
-    public static IReadOnlyList<DocumentTemplate> All { get; } = new[]
+    private static readonly JsonSerializerOptions ManifestOptions = new()
     {
-        new DocumentTemplate("General Notetaking — Plain Text", null, NotePlain),
-        new DocumentTemplate("General Notetaking — Markdown", TextModes.Markdown, NoteMarkdown),
-        new DocumentTemplate("General Notetaking — reStructuredText", TextModes.ReStructuredText, NoteRst),
-        new DocumentTemplate("General Notetaking — AsciiDoc", TextModes.AsciiDoc, NoteAsciiDoc),
-
-        new DocumentTemplate("Technical Report — Plain Text", null, ReportPlain),
-        new DocumentTemplate("Technical Report — Markdown", TextModes.Markdown, ReportMarkdown),
-        new DocumentTemplate("Technical Report — reStructuredText", TextModes.ReStructuredText, ReportRst),
-        new DocumentTemplate("Technical Report — AsciiDoc", TextModes.AsciiDoc, ReportAsciiDoc),
-
-        new DocumentTemplate("Development Proposal — Plain Text", null, ProposalPlain),
-        new DocumentTemplate("Development Proposal — Markdown", TextModes.Markdown, ProposalMarkdown),
-        new DocumentTemplate("Development Proposal — reStructuredText", TextModes.ReStructuredText, ProposalRst),
-        new DocumentTemplate("Development Proposal — AsciiDoc", TextModes.AsciiDoc, ProposalAsciiDoc),
-
-        new DocumentTemplate("Software Engineering — README", TextModes.Markdown, ReadmeMarkdown),
-        new DocumentTemplate("Software Engineering — Changelog", TextModes.Markdown, ChangelogMarkdown),
-        new DocumentTemplate("Software Engineering — Architecture Decision Record", TextModes.Markdown, AdrMarkdown),
-        new DocumentTemplate("Software Engineering — Bug Report", TextModes.Markdown, BugReportMarkdown),
-        new DocumentTemplate("Software Engineering — Pull Request", TextModes.Markdown, PullRequestMarkdown),
-        new DocumentTemplate("Software Engineering — Design Doc", TextModes.Markdown, DesignDocMarkdown),
+        PropertyNameCaseInsensitive = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
     };
+
+    public static IReadOnlyList<DocumentTemplate> All { get; } = Load();
+
+    private static IReadOnlyList<DocumentTemplate> Load()
+    {
+        var assembly = typeof(DocumentTemplates).Assembly;
+        var resourceNames = assembly.GetManifestResourceNames();
+
+        var manifestJson = ReadResourceText(assembly, ResolveResource(resourceNames, ManifestResource));
+        var manifest = JsonSerializer.Deserialize<TemplateManifest>(manifestJson, ManifestOptions)
+            ?? throw new InvalidOperationException("Template manifest could not be parsed.");
+
+        var templates = new List<DocumentTemplate>(manifest.Templates.Count);
+        foreach (var entry in manifest.Templates)
+        {
+            var resource = ResolveResource(resourceNames, ContentResourcePrefix + entry.File);
+            var content = ReadResourceText(assembly, resource);
+            templates.Add(new DocumentTemplate(
+                entry.Category,
+                entry.Variant,
+                NormalizeMode(entry.Mode),
+                StripTrailingNewline(content)));
+        }
+
+        return templates;
+    }
+
+    /// <summary>
+    /// Resolve an embedded resource by its expected name, tolerating any
+    /// build-time munging of the name by falling back to a unique suffix match.
+    /// </summary>
+    private static string ResolveResource(string[] resourceNames, string expected)
+    {
+        if (Array.IndexOf(resourceNames, expected) >= 0)
+            return expected;
+
+        var fileName = expected[(expected.LastIndexOf('.', expected.LastIndexOf('.') - 1) + 1)..];
+        var matches = resourceNames.Where(n => n.EndsWith(fileName, StringComparison.Ordinal)).ToArray();
+        return matches.Length == 1
+            ? matches[0]
+            : throw new InvalidOperationException(
+                $"Embedded template resource '{expected}' not found (matches: {matches.Length}).");
+    }
+
+    private static string? NormalizeMode(string? mode) => mode switch
+    {
+        null or "" => null,
+        TextModes.Markdown => TextModes.Markdown,
+        TextModes.AsciiDoc => TextModes.AsciiDoc,
+        TextModes.ReStructuredText => TextModes.ReStructuredText,
+        _ => throw new InvalidOperationException($"Unknown template mode '{mode}' in manifest."),
+    };
+
+    /// <summary>Drop the single conventional end-of-file newline so applied templates have no trailing blank line.</summary>
+    private static string StripTrailingNewline(string text)
+    {
+        if (text.EndsWith('\n'))
+            text = text[..^1];
+        if (text.EndsWith('\r'))
+            text = text[..^1];
+        return text;
+    }
+
+    private static string ReadResourceText(Assembly assembly, string resourceName)
+    {
+        using var stream = assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException($"Embedded template resource '{resourceName}' not found.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
+    private sealed record TemplateManifest(
+        [property: JsonPropertyName("templates")] IReadOnlyList<TemplateEntry> Templates);
+
+    private sealed record TemplateEntry(
+        [property: JsonPropertyName("category")] string Category,
+        [property: JsonPropertyName("variant")] string Variant,
+        [property: JsonPropertyName("mode")] string? Mode,
+        [property: JsonPropertyName("file")] string File);
 }

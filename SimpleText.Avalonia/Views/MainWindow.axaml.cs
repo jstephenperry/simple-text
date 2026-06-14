@@ -489,26 +489,18 @@ public partial class MainWindow : Window
 
     private void BuildTemplateMenu()
     {
-        foreach (var group in DocumentTemplates.All.GroupBy(t => SplitTemplateName(t.Name).Category))
+        foreach (var group in DocumentTemplates.All.GroupBy(t => t.Category))
         {
             var categoryMenu = new MenuItem { Header = group.Key };
             foreach (var template in group)
             {
-                var item = new MenuItem { Header = SplitTemplateName(template.Name).Variant };
+                var item = new MenuItem { Header = template.Variant };
                 var captured = template;
                 item.Click += (_, _) => ApplyTemplate(captured);
                 categoryMenu.Items.Add(item);
             }
             NewFromTemplateMenu.Items.Add(categoryMenu);
         }
-    }
-
-    private static (string Category, string Variant) SplitTemplateName(string name)
-    {
-        var index = name.IndexOf('—'); // em dash separator: "Category — Variant"
-        return index < 0
-            ? (name, name)
-            : (name[..index].Trim(), name[(index + 1)..].Trim());
     }
 
     private void ApplyTemplate(DocumentTemplate template)
