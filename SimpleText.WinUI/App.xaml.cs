@@ -16,6 +16,9 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        // Resolve storage roots and seed default templates before anything reads them.
+        Services.StorageBootstrap.Initialize();
+
         var window = new MainWindow();
         Window = window;
 
@@ -31,13 +34,44 @@ public partial class App : Application
             window.EnsureFallbackTab();
         }
 
-        // CLI file argument: open after session restore as an additional tab
-        // (or activate the already-restored tab with that path) and focus it.
-        var commandLine = Environment.GetCommandLineArgs();
-        if (commandLine.Length > 1 && File.Exists(commandLine[1]))
-            window.OpenFileAtStartup(commandLine[1]);
+        // Open any files this launch was activated with (file-type association or a
+        // command-line path) after session restore, as additional tabs.
+        foreach (var path in GetStartupFiles())
+            window.OpenFileAtStartup(path);
 
         window.Activate();
+    }
+
+    /// <summary>
+    /// The files this instance was launched to open. A packaged file-type-association
+    /// launch arrives as a <see cref="ExtendedActivationKind.File"/> activation (the
+    /// LaunchActivatedEventArgs reports "Launch" unconditionally and cannot be used);
+    /// an unpackaged launch may carry a single path on the command line.
+    /// </summary>
+    private static IEnumerable<string> GetStartupFiles()
+    {
+        AppActivationArguments? activation = null;
+        try
+        {
+            activation = AppInstance.GetCurrent().GetActivatedEventArgs();
+        }
+        catch
+        {
+            // Activation args are unavailable in some hosts; fall through to the command line.
+        }
+
+        if (activation?.Kind == ExtendedActivationKind.File
+            && activation.Data is Windows.ApplicationModel.Activation.IFileActivatedEventArgs fileArgs)
+        {
+            foreach (var item in fileArgs.Files)
+                if (!string.IsNullOrEmpty(item.Path) && File.Exists(item.Path))
+                    yield return item.Path;
+            yield break;
+        }
+
+        var commandLine = Environment.GetCommandLineArgs();
+        if (commandLine.Length > 1 && File.Exists(commandLine[1]))
+            yield return commandLine[1];
     }
 
     private void OnAppUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
@@ -66,14 +100,22 @@ public partial class App : Application
         if (window == null)
             return;
 
-        string? path = null;
-        if (args.Kind == ExtendedActivationKind.Launch
-            && args.Data is Windows.ApplicationModel.Activation.ILaunchActivatedEventArgs launch)
+        var paths = new List<string>();
+        if (args.Kind == ExtendedActivationKind.File
+            && args.Data is Windows.ApplicationModel.Activation.IFileActivatedEventArgs fileArgs)
         {
-            path = ExtractFilePath(launch.Arguments);
+            foreach (var item in fileArgs.Files)
+                if (!string.IsNullOrEmpty(item.Path) && File.Exists(item.Path))
+                    paths.Add(item.Path);
+        }
+        else if (args.Kind == ExtendedActivationKind.Launch
+            && args.Data is Windows.ApplicationModel.Activation.ILaunchActivatedEventArgs launch
+            && ExtractFilePath(launch.Arguments) is { } path)
+        {
+            paths.Add(path);
         }
 
-        window.DispatcherQueue.TryEnqueue(() => window.HandleRedirectedActivation(path));
+        window.DispatcherQueue.TryEnqueue(() => window.HandleRedirectedActivation(paths));
     }
 
     /// <summary>

@@ -34,6 +34,9 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
 
+        // Mica backdrop — the standard Windows 11 window material.
+        SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop();
+
         Title = "Untitled - SimpleText";
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1100, 700));
         TrySetWindowIcon();
@@ -825,9 +828,9 @@ public sealed partial class MainWindow : Window
     /// Handles an activation redirected from a second app instance: opens the requested
     /// file (if any) and brings this window to the foreground. Must run on the UI thread.
     /// </summary>
-    public void HandleRedirectedActivation(string? filePath)
+    public void HandleRedirectedActivation(IReadOnlyList<string> filePaths)
     {
-        if (filePath != null)
+        foreach (var filePath in filePaths)
             _ = OpenPathAsync(filePath);
         BringToForeground();
     }

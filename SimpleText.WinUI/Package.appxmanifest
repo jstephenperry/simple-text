@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  Identity values are placeholders for local/sideload builds.
+    * For the Microsoft Store: replace Name, Publisher, and PublisherDisplayName
+      with the values Partner Center assigns when you reserve the app name, and
+      build with AppxPackageSigningEnabled=false (the Store signs the package).
+    * For sideload / direct-download builds: Publisher MUST exactly match the
+      subject of the code-signing certificate used to sign the package.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="SimpleText.Editor"
+    Publisher="CN=SimpleText"
+    Version="1.0.0.0" />
+
+  <Properties>
+    <DisplayName>SimpleText</DisplayName>
+    <PublisherDisplayName>SimpleText</PublisherDisplayName>
+    <Logo>Images\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="x-generate" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="$targetentrypoint$">
+      <uap:VisualElements
+        DisplayName="SimpleText"
+        Description="A lightweight text editor for plain text and lightweight markup formats (Markdown, AsciiDoc, reStructuredText)."
+        BackgroundColor="#0A4FA0"
+        Square150x150Logo="Images\Square150x150Logo.png"
+        Square44x44Logo="Images\Square44x44Logo.png">
+        <uap:DefaultTile
+          Wide310x150Logo="Images\Wide310x150Logo.png"
+          Square71x71Logo="Images\Square71x71Logo.png"
+          Square310x310Logo="Images\Square310x310Logo.png">
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="square150x150Logo" />
+            <uap:ShowOn Tile="wide310x150Logo" />
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile>
+        <uap:SplashScreen Image="Images\SplashScreen.png" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <!-- Native "Open with" / default-editor integration for the formats SimpleText edits. -->
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="simpletext">
+            <uap:DisplayName>SimpleText Document</uap:DisplayName>
+            <uap:Logo>Images\Square44x44Logo.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.txt</uap:FileType>
+              <uap:FileType>.text</uap:FileType>
+              <uap:FileType>.md</uap:FileType>
+              <uap:FileType>.markdown</uap:FileType>
+              <uap:FileType>.rst</uap:FileType>
+              <uap:FileType>.adoc</uap:FileType>
+              <uap:FileType>.asciidoc</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- WinUI 3 desktop apps run full trust (medium IL, outside the AppContainer sandbox). -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

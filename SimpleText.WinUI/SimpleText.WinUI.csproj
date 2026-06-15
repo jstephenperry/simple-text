@@ -8,21 +8,45 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
     <Platforms>x64;ARM64</Platforms>
     <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</Platform>
-    <RuntimeIdentifier Condition="'$(Platform)' == 'x64'">win-x64</RuntimeIdentifier>
-    <RuntimeIdentifier Condition="'$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
-    <WindowsPackageType>None</WindowsPackageType>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <PublishProfile>Properties\PublishProfiles\win-$(Platform).pubxml</PublishProfile>
+    <!-- Packaged (MSIX) app. Self-contained so sideloaded packages install without a
+         separate Windows App SDK runtime; also accepted for Store submissions. -->
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <!-- Custom Main in Program.cs handles single-instance activation redirection. -->
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <!-- Custom Main in Program.cs handles single-instance activation redirection and
+         file-type-association activation. -->
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
+    <AppxManifest Include="Package.appxmanifest">
+      <SubType>Designer</SubType>
+    </AppxManifest>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- MSIX visual assets, generated from branding/simpletext.svg by
+         build/generate-winui-assets.sh (run in CI before packaging). -->
+    <Content Include="Images\**\*.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Copied to output so AppWindow.SetIcon can load it at runtime (title bar / taskbar). -->
     <Content Include="Assets\app.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Ship the default templates next to the executable for first-run seeding. -->
+  <ItemGroup>
+    <Content Include="..\SimpleText.Core\Templates\Defaults\**\*">
+      <Link>Templates\Defaults\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
