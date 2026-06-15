@@ -15,8 +15,13 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Highlighting\Grammars\rst.tmLanguage.json" />
-    <EmbeddedResource Include="Templates\templates.json" />
-    <EmbeddedResource Include="Templates\Content\**\*" />
   </ItemGroup>
+
+  <!--
+    Default templates live as ordinary files under Templates\Defaults\ (picked up by the
+    SDK's default None glob). They are deliberately not embedded or compiled: each frontend
+    links them into its own output under Templates\Defaults\ for first-run seeding by
+    TemplateSeeder, so AppContext.BaseDirectory resolves them at runtime.
+  -->
 
 </Project>

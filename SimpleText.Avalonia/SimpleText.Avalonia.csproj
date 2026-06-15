@@ -23,6 +23,14 @@
     <AvaloniaResource Include="Assets/**" />
   </ItemGroup>
 
+  <!-- Ship the shipped default templates next to the executable for first-run seeding. -->
+  <ItemGroup>
+    <Content Include="..\SimpleText.Core\Templates\Defaults\**\*">
+      <Link>Templates\Defaults\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\SimpleText.Core\SimpleText.Core.csproj" />
   </ItemGroup>

@@ -1,19 +1,19 @@
 using System.Text.Json;
+using SimpleText.Core.Storage;
 
 namespace SimpleText.WinUI.Services;
 
 /// <summary>
-/// Persists the theme preference to %LOCALAPPDATA%\SimpleText\theme.json using the exact
-/// same file format and values as SimpleText.Avalonia's ThemeService ({"Theme":"Light"},
-/// {"Theme":"Dark"} or {"Theme":"System"}), so both frontends share the preference.
+/// Persists the theme preference to theme.json under the app state directory
+/// (<see cref="AppStorage.StateDirectory"/>) using the format {"Theme":"Light"},
+/// {"Theme":"Dark"} or {"Theme":"System"}. In the packaged build this lives in the
+/// package-private store; unpackaged it shares %LOCALAPPDATA%\SimpleText with Avalonia.
 /// </summary>
 internal static class ThemeService
 {
-    private static readonly string ConfigDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "SimpleText");
+    private static string ConfigDir => AppStorage.StateDirectory;
 
-    private static readonly string ThemeFile = Path.Combine(ConfigDir, "theme.json");
+    private static string ThemeFile => Path.Combine(ConfigDir, "theme.json");
 
     /// <summary>
     /// Returns "Light" or "Dark" for an explicit preference, or null to follow the

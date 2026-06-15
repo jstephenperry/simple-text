@@ -1,16 +1,15 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using SimpleText.Core.Storage;
 
 namespace SimpleText.Core.Session;
 
 public static class SessionManager
 {
-    private static readonly string SessionDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "SimpleText");
+    private static string SessionDir => AppStorage.StateDirectory;
 
-    private static readonly string SessionFile = Path.Combine(SessionDir, "session.json");
+    private static string SessionFile => Path.Combine(SessionDir, "session.json");
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

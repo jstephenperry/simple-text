@@ -4,8 +4,9 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
+    <!-- Transparent root lets the Mica backdrop show through the chrome (Win11 look). -->
     <Grid x:Name="RootGrid"
-          Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+          Background="Transparent"
           AllowDrop="True"
           DragOver="OnRootDragOver"
           Drop="OnRootDrop">

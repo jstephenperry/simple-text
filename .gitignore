@@ -20,5 +20,16 @@ Desktop.ini
 publish/
 out/
 
+## Generated MSIX visual assets (produced by build/generate-winui-assets.sh)
+SimpleText.WinUI/Images/
+
+## MSIX packaging output
+AppPackages/
+*.msix
+*.msixbundle
+*.msixupload
+*.appxsym
+*.pfx
+
 ## Claude Code
 .claude/
