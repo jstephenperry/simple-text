@@ -6,8 +6,8 @@ A lightweight text editor for plain text and lightweight markup formats (Markdow
 
 - Edit plain text files with line numbers and find/replace
 - Semantic syntax highlighting for Markdown ([Markdig](https://github.com/xoofx/markdig) AST), AsciiDoc, and reStructuredText (TextMate grammars via [TextMateSharp](https://github.com/danipen/TextMateSharp))
-- Document templates for productivity (notes, technical reports, proposals) and software engineering (README, changelog, ADR, bug report, pull request, design doc)
-- User-supplied templates: drop a text file in `%LocalAppData%/SimpleText/Templates/` (or the platform equivalent — open it from **Help → Open Templates Folder**) and it auto-registers in the **New from Template** menu — no restart needed. The file name becomes the template name, an immediate sub-folder becomes its category, and the extension (`.md`, `.rst`, `.adoc`, `.txt`, …) sets the editor mode
+- Document templates for productivity (notes, technical reports, proposals) and software engineering (README, changelog, ADR, bug report, pull request, design doc) — shipped as starter files and copied into your templates folder on first run, then yours to edit, add to, or delete
+- Templates are just files: drop a text file in the templates folder (open it from **Help → Open Templates Folder**) and it auto-registers in the **New from Template** menu — no restart needed. The file name becomes the template name, an immediate sub-folder becomes its category, and the extension (`.md`, `.rst`, `.adoc`, `.txt`, …) sets the editor mode. The packaged WinUI build keeps them in `Documents\SimpleText\Templates` (visible, durable, survives uninstall); the unpackaged/Avalonia build uses `%LocalAppData%/SimpleText/Templates/`
 - Session persistence — picks up where you left off, even after a crash
 - Drag-and-drop file opening
 
@@ -21,22 +21,31 @@ Both frontends share the same feature set: Notepad++-style tabbed editing, multi
 
 ## Building
 
-Requires .NET 10 SDK.
+Requires the .NET 10 SDK.
 
+Core library and the cross-platform Avalonia version (Windows/macOS/Linux):
 ```
-dotnet build SimpleText.sln
-```
-
-Run the WinUI 3 version (Windows only):
-```
-dotnet build SimpleText.WinUI/SimpleText.WinUI.csproj
-SimpleText.WinUI/bin/x64/Debug/net10.0-windows10.0.19041.0/win-x64/SimpleText.WinUI.exe
+dotnet build SimpleText.Core/SimpleText.Core.csproj
+dotnet run   --project SimpleText.Avalonia/SimpleText.Avalonia.csproj
 ```
 
-Run the Avalonia version (cross-platform):
+### WinUI 3 (packaged MSIX, Windows only)
+
+The WinUI frontend is a packaged **MSIX** application (single-project MSIX,
+`x64`/`ARM64`). The simplest path is Visual Studio: open `SimpleText.sln`, set
+**SimpleText.WinUI** as startup, pick a platform, and **F5** (deploys and runs).
+
+To package from the command line, first generate the visual assets, then build:
 ```
-dotnet run --project SimpleText.Avalonia/SimpleText.Avalonia.csproj
+./build/generate-winui-assets.sh        # needs librsvg2-bin + imagemagick; writes SimpleText.WinUI/Images
+msbuild SimpleText.WinUI/SimpleText.WinUI.csproj /p:Configuration=Release /p:Platform=x64 ^
+  /p:GenerateAppxPackageOnBuild=true /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false
 ```
+
+CI/CD builds this for you: see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+(PR/branch build checks) and [`.github/workflows/release.yml`](.github/workflows/release.yml)
+(tag `v*` → signed packages on a GitHub Release). Packaging and storage details
+are in [`docs/msix-packaging.md`](docs/msix-packaging.md).
 
 ## Disclaimer
 

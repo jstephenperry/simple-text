@@ -18,13 +18,10 @@
   </ItemGroup>
 
   <!--
-    Default templates ship as ordinary files (not embedded resources) and are seeded
-    into the user's templates folder on first run by TemplateSeeder. Each frontend
-    links them into its own output under Templates\Defaults\ so AppContext.BaseDirectory
-    resolves them at runtime. They are deliberately not compiled or embedded here.
+    Default templates live as ordinary files under Templates\Defaults\ (picked up by the
+    SDK's default None glob). They are deliberately not embedded or compiled: each frontend
+    links them into its own output under Templates\Defaults\ for first-run seeding by
+    TemplateSeeder, so AppContext.BaseDirectory resolves them at runtime.
   -->
-  <ItemGroup>
-    <None Include="Templates\Defaults\**\*" />
-  </ItemGroup>
 
 </Project>

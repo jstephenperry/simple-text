@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'claude/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast, cross-platform sanity check of the shared core (where most logic lives).
+  # The Avalonia frontend is intentionally excluded from CI.
+  core:
+    name: Build core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet build SimpleText.Core/SimpleText.Core.csproj -c Release
+
+  # Render the MSIX visual assets from the brand SVG (reliable tooling on Linux).
+  assets:
+    name: Generate visual assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install rasterizers
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends librsvg2-bin imagemagick
+      - run: ./build/generate-winui-assets.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: winui-images
+          path: SimpleText.WinUI/Images/
+          if-no-files-found: error
+
+  # The real verification: build the packaged MSIX (unsigned) on Windows.
+  build-msix:
+    name: Build MSIX (${{ matrix.platform }})
+    needs: assets
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [x64, ARM64]
+    env:
+      Project: SimpleText.WinUI/SimpleText.WinUI.csproj
+      PackageDir: ${{ github.workspace }}\AppPackages
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Download generated assets
+        uses: actions/download-artifact@v4
+        with:
+          name: winui-images
+          path: SimpleText.WinUI/Images
+
+      - name: Restore
+        run: dotnet restore "${{ env.Project }}" -p:Platform=${{ matrix.platform }}
+
+      - name: Build MSIX (unsigned)
+        shell: pwsh
+        run: |
+          msbuild "${{ env.Project }}" `
+            /p:Configuration=Release `
+            /p:Platform=${{ matrix.platform }} `
+            /p:GenerateAppxPackageOnBuild=true `
+            /p:AppxPackageDir="${{ env.PackageDir }}\" `
+            /p:UapAppxPackageBuildMode=SideloadOnly `
+            /p:AppxBundle=Never `
+            /p:AppxPackageSigningEnabled=false
+
+      - name: Upload unsigned package
+        uses: actions/upload-artifact@v4
+        with:
+          name: msix-unsigned-${{ matrix.platform }}
+          path: ${{ env.PackageDir }}/**/*.msix
+          if-no-files-found: error
