@@ -39,6 +39,9 @@
         <MenuItem x:Name="ZoomOutMenuItem" Header="Zoom _Out" InputGesture="Ctrl+OemMinus" />
         <MenuItem x:Name="ResetZoomMenuItem" Header="_Reset Zoom" InputGesture="Ctrl+D0" />
       </MenuItem>
+      <MenuItem Header="_Help">
+        <MenuItem x:Name="OpenTemplatesFolderMenuItem" Header="Open _Templates Folder" />
+      </MenuItem>
     </Menu>
 
     <!-- Dismissible info banner (hidden by default) -->

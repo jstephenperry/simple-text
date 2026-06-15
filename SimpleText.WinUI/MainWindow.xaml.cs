@@ -39,6 +39,7 @@ public sealed partial class MainWindow : Window
         TrySetWindowIcon();
 
         BuildTemplateMenu();
+        TemplateCatalog.Shared.Changed += OnTemplatesChanged;
         AddOemZoomAccelerators();
 
         RootGrid.ActualThemeChanged += (_, _) => ApplyEditorThemeToAllPanes();
@@ -416,12 +417,13 @@ public sealed partial class MainWindow : Window
 
     private void BuildTemplateMenu()
     {
-        foreach (var group in DocumentTemplates.All.GroupBy(t => SplitTemplateName(t.Name).Category))
+        NewFromTemplateMenu.Items.Clear();
+        foreach (var group in TemplateCatalog.Shared.All.GroupBy(t => t.Category))
         {
             var categoryMenu = new MenuFlyoutSubItem { Text = group.Key };
             foreach (var template in group)
             {
-                var item = new MenuFlyoutItem { Text = SplitTemplateName(template.Name).Variant };
+                var item = new MenuFlyoutItem { Text = template.Variant };
                 item.Click += (_, _) => ApplyTemplate(template);
                 categoryMenu.Items.Add(item);
             }
@@ -429,13 +431,8 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private static (string Category, string Variant) SplitTemplateName(string name)
-    {
-        var index = name.IndexOf('—'); // em dash separator: "Category — Variant"
-        return index < 0
-            ? (name, name)
-            : (name[..index].Trim(), name[(index + 1)..].Trim());
-    }
+    private void OnTemplatesChanged(object? sender, EventArgs e)
+        => DispatcherQueue.TryEnqueue(BuildTemplateMenu);
 
     private void ApplyTemplate(DocumentTemplate template)
     {
@@ -445,6 +442,14 @@ public sealed partial class MainWindow : Window
         pane.CaretPosition = 0;
         RefreshPaneUi(pane);
         pane.FocusEditor();
+    }
+
+    private async void OnOpenTemplatesFolderClick(object sender, RoutedEventArgs e)
+    {
+        var path = TemplateCatalog.Shared.UserTemplatesDirectory;
+        Directory.CreateDirectory(path);
+        var folder = await StorageFolder.GetFolderFromPathAsync(path);
+        await Launcher.LaunchFolderAsync(folder);
     }
 
     // --- Mode menu ---
@@ -874,6 +879,7 @@ public sealed partial class MainWindow : Window
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
         // Notepad++ behavior: no save prompts on exit — the session preserves unsaved work.
+        TemplateCatalog.Shared.Changed -= OnTemplatesChanged;
         _sessionTimer?.Stop();
         SaveWorkspaceSession();
     }
