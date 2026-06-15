@@ -1,30 +1,31 @@
 using SimpleText.Core.FileTypes;
+using SimpleText.Core.Storage;
 
 namespace SimpleText.Core.Templates;
 
 /// <summary>
-/// The live set of document templates shown in the UI: the embedded built-ins
-/// plus any user-supplied templates discovered under
-/// <c>%LocalAppData%/SimpleText/Templates/</c>.
+/// The live set of document templates shown in the UI: every template is a file
+/// discovered under the user-owned templates folder
+/// (<see cref="AppStorage.TemplatesDirectory"/>). The shipped defaults are copied
+/// there once by <see cref="TemplateSeeder"/>; from then on the folder is the
+/// single source of truth and is entirely the user's.
 ///
-/// <para>User templates auto-register by convention — drop a text file in that
-/// folder and it appears in the menu. The file name (without extension) becomes
-/// the template's <see cref="DocumentTemplate.Variant"/>; an immediate
-/// sub-folder name becomes its <see cref="DocumentTemplate.Category"/> (files
-/// placed directly in the root fall under "<see cref="DefaultUserCategory"/>");
-/// and the extension determines the editor mode via
-/// <see cref="ModeDetector"/>.</para>
+/// <para>Templates auto-register by convention — drop a text file in the folder
+/// and it appears in the menu. The file name (without extension) becomes the
+/// template's <see cref="DocumentTemplate.Variant"/>; an immediate sub-folder
+/// name becomes its <see cref="DocumentTemplate.Category"/> (files placed
+/// directly in the root fall under "<see cref="DefaultUserCategory"/>"); and the
+/// extension determines the editor mode via <see cref="ModeDetector"/>.</para>
 ///
 /// <para>The folder is watched, so adding, editing, or removing a file raises
-/// <see cref="Changed"/> without an app restart. User templates are always shown
-/// <em>alongside</em> built-ins; they never override them.</para>
+/// <see cref="Changed"/> without an app restart.</para>
 ///
 /// <para><see cref="Changed"/> is raised on a background thread — UI subscribers
 /// must marshal to their dispatcher before touching the UI.</para>
 /// </summary>
 public sealed class TemplateCatalog : IDisposable
 {
-    /// <summary>Category assigned to user templates placed directly in the root folder.</summary>
+    /// <summary>Category assigned to templates placed directly in the root folder.</summary>
     public const string DefaultUserCategory = "My Templates";
 
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -34,21 +35,23 @@ public sealed class TemplateCatalog : IDisposable
 
     private static readonly TimeSpan DebounceDelay = TimeSpan.FromMilliseconds(250);
 
-    /// <summary>Process-wide shared catalog used by the application frontends.</summary>
-    public static TemplateCatalog Shared { get; } = new();
+    private static TemplateCatalog? _shared;
+
+    /// <summary>
+    /// Process-wide shared catalog used by the application frontends, rooted at
+    /// <see cref="AppStorage.TemplatesDirectory"/>. Configure storage (and seed
+    /// defaults) before first access.
+    /// </summary>
+    public static TemplateCatalog Shared => _shared ??= new TemplateCatalog(AppStorage.TemplatesDirectory);
 
     private readonly object _gate = new();
     private readonly Timer _debounce;
     private FileSystemWatcher? _watcher;
-    private IReadOnlyList<DocumentTemplate> _all = DocumentTemplates.BuiltIns;
+    private IReadOnlyList<DocumentTemplate> _all = [];
 
-    public TemplateCatalog() : this(DefaultUserTemplatesDirectory())
+    public TemplateCatalog(string templatesDirectory)
     {
-    }
-
-    public TemplateCatalog(string userTemplatesDirectory)
-    {
-        UserTemplatesDirectory = userTemplatesDirectory;
+        UserTemplatesDirectory = templatesDirectory;
         _debounce = new Timer(_ => Reload(), null, Timeout.Infinite, Timeout.Infinite);
 
         Reload();
@@ -61,30 +64,24 @@ public sealed class TemplateCatalog : IDisposable
     /// <summary>The folder users drop templates into. Created on first use.</summary>
     public string UserTemplatesDirectory { get; }
 
-    /// <summary>Current snapshot: built-ins first, then user templates.</summary>
+    /// <summary>Current snapshot, ordered by category then variant.</summary>
     public IReadOnlyList<DocumentTemplate> All
     {
         get { lock (_gate) return _all; }
     }
 
-    private static string DefaultUserTemplatesDirectory() => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "SimpleText",
-        "Templates");
-
-    /// <summary>Rebuild the merged catalog from disk and notify subscribers.</summary>
+    /// <summary>Rebuild the catalog from disk and notify subscribers.</summary>
     public void Reload()
     {
-        var merged = new List<DocumentTemplate>(DocumentTemplates.BuiltIns);
-        merged.AddRange(LoadUserTemplates());
+        var templates = LoadTemplates();
 
         lock (_gate)
-            _all = merged;
+            _all = templates;
 
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    private IEnumerable<DocumentTemplate> LoadUserTemplates()
+    private IReadOnlyList<DocumentTemplate> LoadTemplates()
     {
         string root = UserTemplatesDirectory;
         if (!Directory.Exists(root))
@@ -128,12 +125,13 @@ public sealed class TemplateCatalog : IDisposable
                 DeriveCategory(root, file),
                 variant,
                 ModeDetector.DetectFromPath(file),
-                DocumentTemplates.StripTrailingNewline(content)));
+                StripTrailingNewline(content)));
         }
 
         return templates
             .OrderBy(t => t.Category, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(t => t.Variant, StringComparer.OrdinalIgnoreCase);
+            .ThenBy(t => t.Variant, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     /// <summary>Immediate sub-folder name, or <see cref="DefaultUserCategory"/> for files in the root.</summary>
@@ -142,6 +140,16 @@ public sealed class TemplateCatalog : IDisposable
         var relative = Path.GetRelativePath(root, file);
         var separator = relative.IndexOfAny([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]);
         return separator < 0 ? DefaultUserCategory : relative[..separator];
+    }
+
+    /// <summary>Drop the single conventional end-of-file newline so applied templates have no trailing blank line.</summary>
+    private static string StripTrailingNewline(string text)
+    {
+        if (text.EndsWith('\n'))
+            text = text[..^1];
+        if (text.EndsWith('\r'))
+            text = text[..^1];
+        return text;
     }
 
     private void StartWatching()

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using SimpleText.Core.Storage;
 
 namespace SimpleText.Core.Session;
 
@@ -16,9 +17,7 @@ public sealed class WorkspaceSessionData
 
 public static class WorkspaceSessionManager
 {
-    private static readonly string SessionDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "SimpleText");
+    private static string SessionDir => AppStorage.StateDirectory;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

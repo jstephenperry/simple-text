@@ -1,15 +1,14 @@
 using System.Text.Json;
 using Avalonia.Styling;
+using SimpleText.Core.Storage;
 
 namespace SimpleText.Avalonia.Services;
 
 internal static class ThemeService
 {
-    private static readonly string ConfigDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "SimpleText");
+    private static string ConfigDir => AppStorage.StateDirectory;
 
-    private static readonly string ThemeFile = Path.Combine(ConfigDir, "theme.json");
+    private static string ThemeFile => Path.Combine(ConfigDir, "theme.json");
 
     public static ThemeVariant? LoadPreference()
     {
