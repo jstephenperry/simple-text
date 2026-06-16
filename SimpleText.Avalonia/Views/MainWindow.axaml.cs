@@ -8,6 +8,7 @@ using Avalonia.Styling;
 using Avalonia.Threading;
 using SimpleText.Avalonia.Services;
 using SimpleText.Core;
+using SimpleText.Core.Elements;
 using SimpleText.Core.FileTypes;
 using SimpleText.Core.Session;
 using SimpleText.Core.Templates;
@@ -147,6 +148,7 @@ public partial class MainWindow : Window
         UpdateLineColStatus();
         UpdateStatusFileInfo();
         UpdateModeMenuChecks();
+        BuildInsertMenu();
     }
 
     private void UpdateTitle()
@@ -526,6 +528,44 @@ public partial class MainWindow : Window
         pane.FocusEditor();
     }
 
+    // --- Insert menu ---
+
+    /// <summary>
+    /// Rebuilds the Insert menu for the active pane's mode. Called whenever the active
+    /// tab or its mode changes; plain text shows a disabled placeholder.
+    /// </summary>
+    private void BuildInsertMenu()
+    {
+        InsertMenu.Items.Clear();
+
+        var elements = ElementCatalog.ForMode(ActivePane?.Mode);
+        if (elements.Count == 0)
+        {
+            InsertMenu.Items.Add(new MenuItem
+            {
+                Header = $"No elements for {ActivePane?.FileTypeName ?? "Plain Text"}",
+                IsEnabled = false,
+            });
+            return;
+        }
+
+        foreach (var group in elements.GroupBy(e => e.Category))
+        {
+            var categoryMenu = new MenuItem { Header = group.Key };
+            foreach (var element in group)
+            {
+                var item = new MenuItem { Header = element.Name };
+                var captured = element;
+                item.Click += (_, _) => InsertActiveElement(captured);
+                categoryMenu.Items.Add(item);
+            }
+            InsertMenu.Items.Add(categoryMenu);
+        }
+    }
+
+    private void InsertActiveElement(DocumentElement element)
+        => ActivePane?.InsertElement(element.Body, element.CaretOffset);
+
     // --- Mode menu ---
 
     private void SetActiveMode(string? mode)
@@ -537,6 +577,7 @@ public partial class MainWindow : Window
             UpdateTabHeader(tab);
         UpdateModeMenuChecks();
         UpdateStatusFileInfo();
+        BuildInsertMenu();
         _sessionDirty = true;
     }
 

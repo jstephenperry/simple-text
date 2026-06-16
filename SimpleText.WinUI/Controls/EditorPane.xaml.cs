@@ -199,6 +199,28 @@ public sealed partial class EditorPane : UserControl
         return (line + 1, pos - _lineStarts[line] + 1);
     }
 
+    /// <summary>
+    /// Inserts <paramref name="body"/> at the caret (replacing any selection) and moves the
+    /// caret to <paramref name="caretWithinBody"/> within the inserted text. The async
+    /// TextChanged pass marks the pane dirty and re-highlights.
+    /// </summary>
+    public void InsertElement(string body, int caretWithinBody)
+    {
+        var selection = Editor.TextDocument.Selection;
+        int start = Math.Min(selection.StartPosition, selection.EndPosition);
+
+        // RichEdit stores paragraph breaks as '\r'; normalize like SetText/paste so
+        // positions stay in the same space as GetText offsets. Each newline stays one
+        // character, so caretWithinBody carries over unchanged.
+        var rich = body.Replace("\r\n", "\r").Replace('\n', '\r');
+        selection.SetText(TextSetOptions.None, rich);
+
+        int target = Math.Clamp(start + caretWithinBody, 0, GetText().Length);
+        selection.SetRange(target, target);
+        selection.ScrollIntoView(PointOptions.None);
+        FocusEditor();
+    }
+
     // --- File operations ---
 
     public void LoadFromFile(string path)

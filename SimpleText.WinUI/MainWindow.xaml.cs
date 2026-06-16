@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using SimpleText.Core;
+using SimpleText.Core.Elements;
 using SimpleText.Core.FileTypes;
 using SimpleText.Core.Session;
 using SimpleText.Core.Templates;
@@ -42,6 +43,7 @@ public sealed partial class MainWindow : Window
         TrySetWindowIcon();
 
         BuildTemplateMenu();
+        BuildInsertMenu();
         TemplateCatalog.Shared.Changed += OnTemplatesChanged;
         AddOemZoomAccelerators();
 
@@ -135,6 +137,7 @@ public sealed partial class MainWindow : Window
         UpdateLineColStatus();
         UpdateStatusFileInfo();
         UpdateModeMenuChecks();
+        BuildInsertMenu();
     }
 
     private void UpdateTitle()
@@ -455,6 +458,43 @@ public sealed partial class MainWindow : Window
         await Launcher.LaunchFolderAsync(folder);
     }
 
+    // --- Insert menu ---
+
+    /// <summary>
+    /// Rebuilds the Insert menu for the active pane's mode. Called whenever the active
+    /// tab or its mode changes; plain text shows a disabled placeholder.
+    /// </summary>
+    private void BuildInsertMenu()
+    {
+        InsertMenu.Items.Clear();
+
+        var elements = ElementCatalog.ForMode(ActivePane?.Mode);
+        if (elements.Count == 0)
+        {
+            InsertMenu.Items.Add(new MenuFlyoutItem
+            {
+                Text = $"No elements for {ActivePane?.FileTypeName ?? "Plain Text"}",
+                IsEnabled = false,
+            });
+            return;
+        }
+
+        foreach (var group in elements.GroupBy(e => e.Category))
+        {
+            var categoryMenu = new MenuFlyoutSubItem { Text = group.Key };
+            foreach (var element in group)
+            {
+                var item = new MenuFlyoutItem { Text = element.Name };
+                item.Click += (_, _) => InsertActiveElement(element);
+                categoryMenu.Items.Add(item);
+            }
+            InsertMenu.Items.Add(categoryMenu);
+        }
+    }
+
+    private void InsertActiveElement(DocumentElement element)
+        => ActivePane?.InsertElement(element.Body, element.CaretOffset);
+
     // --- Mode menu ---
 
     private void OnModePlainTextClick(object sender, RoutedEventArgs e) => SetActiveMode(null);
@@ -469,6 +509,7 @@ public sealed partial class MainWindow : Window
         pane.SetMode(mode);
         UpdateModeMenuChecks();
         UpdateStatusFileInfo();
+        BuildInsertMenu();
         _sessionDirty = true;
     }
 

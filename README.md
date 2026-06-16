@@ -8,6 +8,7 @@ A lightweight text editor for plain text and lightweight markup formats (Markdow
 - Semantic syntax highlighting for Markdown ([Markdig](https://github.com/xoofx/markdig) AST), AsciiDoc, and reStructuredText (TextMate grammars via [TextMateSharp](https://github.com/danipen/TextMateSharp))
 - Document templates for productivity (notes, technical reports, proposals) and software engineering (README, changelog, ADR, bug report, pull request, design doc) — shipped as starter files and copied into your templates folder on first run, then yours to edit, add to, or delete
 - Templates are just files: drop a text file in the templates folder (open it from **Help → Open Templates Folder**) and it auto-registers in the **New from Template** menu — no restart needed. The file name becomes the template name, an immediate sub-folder becomes its category, and the extension (`.md`, `.rst`, `.adoc`, `.txt`, …) sets the editor mode. The packaged WinUI build keeps them in `Documents\SimpleText\Templates` (visible, durable, survives uninstall); the unpackaged/Avalonia build uses `%LocalAppData%/SimpleText/Templates/`
+- Insert base document elements — headings, lists, tables, code blocks, links, images, and equations — from the **Insert** menu, tailored to the current format (Markdown, AsciiDoc, reStructuredText). The fragment drops in at the cursor with the caret placed where you'll type next (like the insert palettes in LaTeX editors)
 - Session persistence — picks up where you left off, even after a crash
 - Drag-and-drop file opening
 
@@ -41,6 +42,29 @@ To package from the command line, first generate the visual assets, then build:
 msbuild SimpleText.WinUI/SimpleText.WinUI.csproj /p:Configuration=Release /p:Platform=x64 ^
   /p:GenerateAppxPackageOnBuild=true /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false
 ```
+
+#### Installing without the "this app may harm your computer" warning
+
+A self-signed MSIX still warns until its certificate is **trusted on your PC** —
+that one-time, free step is what removes the warning. From a *Developer
+PowerShell for VS*:
+
+```powershell
+pwsh build/sign-msix.ps1 -Trust          # build + self-sign + trust (UAC prompt)
+Add-AppxPackage .\AppPackages\...\SimpleText.Editor_*.msix   # or double-click it
+```
+
+Installing a downloaded [Release](../../releases) instead? Trust its certificate once:
+
+```powershell
+pwsh build/trust-cert.ps1 -Path .\SimpleText.cer
+Add-AppxPackage .\SimpleText.Editor_1.0.0.0_x64.msix
+```
+
+The cert is reused across builds, so you only trust it once. For zero per-machine
+setup (e.g. distributing to others), use a CA-issued cert such as
+[Azure Trusted Signing](https://learn.microsoft.com/azure/trusted-signing/)
+instead. Details: [`docs/msix-packaging.md`](docs/msix-packaging.md#why-a-self-signed-package-warns--and-how-to-stop-it).
 
 CI/CD builds this for you: see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 (PR/branch build checks) and [`.github/workflows/release.yml`](.github/workflows/release.yml)

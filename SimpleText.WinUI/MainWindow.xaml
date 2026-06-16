@@ -68,6 +68,8 @@
                 <RadioMenuFlyoutItem x:Name="ModeRstItem" Text="reStructuredText" GroupName="ModeGroup" Click="OnModeRstClick"/>
             </MenuBarItem>
 
+            <MenuBarItem x:Name="InsertMenu" Title="Insert"/>
+
             <MenuBarItem Title="View">
                 <MenuFlyoutSubItem Text="Theme">
                     <RadioMenuFlyoutItem x:Name="ThemeSystemItem" Text="System" GroupName="ThemeGroup" IsChecked="True" Click="OnThemeSystemClick"/>

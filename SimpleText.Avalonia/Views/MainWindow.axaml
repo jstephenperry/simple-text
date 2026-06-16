@@ -27,6 +27,7 @@
         <MenuItem x:Name="ModeAsciiDoc" Header="_AsciiDoc" />
         <MenuItem x:Name="ModeRst" Header="_reStructuredText" />
       </MenuItem>
+      <MenuItem x:Name="InsertMenu" Header="_Insert" />
       <MenuItem Header="_View">
         <MenuItem Header="_Theme">
           <MenuItem x:Name="ThemeSystem" Header="Follow _System" />
