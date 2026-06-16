@@ -1,3 +1,4 @@
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -7,7 +8,9 @@ using SimpleText.Core.FileTypes;
 using SimpleText.Core.Session;
 using SimpleText.Core.Templates;
 using SimpleText.WinUI.Controls;
+using SimpleText.WinUI.Services;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Graphics;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using Windows.System;
@@ -21,6 +24,10 @@ public sealed partial class MainWindow : Window
     private const int MinFontSize = 8;
     private const int MaxFontSize = 32;
 
+    // Minimum window size in physical pixels (WinUI has no built-in minimum).
+    private const int MinWindowWidth = 500;
+    private const int MinWindowHeight = 360;
+
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _sessionTimer;
     private bool _sessionDirty;
     private string _lastFindTerm = string.Empty;
@@ -28,6 +35,11 @@ public sealed partial class MainWindow : Window
     private bool _wordWrap;
     private int _fontSizeDelta;
     private string? _themePreference;
+
+    // Tracked window placement: last non-maximized bounds, plus the maximized flag.
+    private RectInt32 _normalBounds;
+    private bool _isMaximized;
+    private bool _enforcingMinSize;
 
     private const string SessionFileName = "session.winui.json";
 
@@ -45,7 +57,8 @@ public sealed partial class MainWindow : Window
         ApplyTitleBarColors();
 
         Title = "Untitled - SimpleText";
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(1100, 700));
+        RestoreWindowPlacement();
+        AppWindow.Changed += OnAppWindowChanged;
         TrySetWindowIcon();
 
         BuildTemplateMenu();
@@ -981,6 +994,87 @@ public sealed partial class MainWindow : Window
         TemplateCatalog.Shared.Changed -= OnTemplatesChanged;
         _sessionTimer?.Stop();
         SaveWorkspaceSession();
+        SaveWindowPlacement();
+    }
+
+    // --- Window placement (size / position / maximized) ---
+
+    /// <summary>
+    /// Restores the saved window placement, clamped onto a connected display, or falls back
+    /// to a sensible default on first run. Re-maximizes if it was left maximized.
+    /// </summary>
+    private void RestoreWindowPlacement()
+    {
+        var saved = WindowStateService.Load();
+        if (saved is { Width: > 0, Height: > 0 })
+        {
+            var rect = ClampToWorkArea(saved.X, saved.Y, saved.Width, saved.Height);
+            AppWindow.MoveAndResize(rect);
+            _normalBounds = rect;
+            if (saved.IsMaximized && AppWindow.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.Maximize();
+                _isMaximized = true;
+            }
+        }
+        else
+        {
+            AppWindow.Resize(new SizeInt32(1100, 700));
+            _normalBounds = new RectInt32(
+                AppWindow.Position.X, AppWindow.Position.Y,
+                AppWindow.Size.Width, AppWindow.Size.Height);
+        }
+    }
+
+    private static RectInt32 ClampToWorkArea(int x, int y, int width, int height)
+    {
+        var area = DisplayArea.GetFromPoint(new PointInt32(x, y), DisplayAreaFallback.Nearest);
+        var work = area?.WorkArea ?? DisplayArea.Primary.WorkArea;
+        int w = Math.Clamp(width, MinWindowWidth, work.Width);
+        int h = Math.Clamp(height, MinWindowHeight, work.Height);
+        int cx = Math.Clamp(x, work.X, work.X + work.Width - w);
+        int cy = Math.Clamp(y, work.Y, work.Y + work.Height - h);
+        return new RectInt32(cx, cy, w, h);
+    }
+
+    private void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        if (sender.Presenter is not OverlappedPresenter presenter)
+            return;
+
+        _isMaximized = presenter.State == OverlappedPresenterState.Maximized;
+        if (_isMaximized || presenter.State == OverlappedPresenterState.Minimized)
+            return;
+
+        // Enforce the minimum size: bump back up if dragged smaller (guard re-entrancy).
+        if (args.DidSizeChange && !_enforcingMinSize)
+        {
+            int w = sender.Size.Width, h = sender.Size.Height;
+            int cw = Math.Max(w, MinWindowWidth), ch = Math.Max(h, MinWindowHeight);
+            if (cw != w || ch != h)
+            {
+                _enforcingMinSize = true;
+                try { sender.Resize(new SizeInt32(cw, ch)); }
+                finally { _enforcingMinSize = false; }
+                return;
+            }
+        }
+
+        // Remember the normal (restorable) placement for next launch.
+        _normalBounds = new RectInt32(
+            sender.Position.X, sender.Position.Y, sender.Size.Width, sender.Size.Height);
+    }
+
+    private void SaveWindowPlacement()
+    {
+        WindowStateService.Save(new WindowPlacement
+        {
+            X = _normalBounds.X,
+            Y = _normalBounds.Y,
+            Width = _normalBounds.Width,
+            Height = _normalBounds.Height,
+            IsMaximized = _isMaximized,
+        });
     }
 
     // --- Helpers ---
