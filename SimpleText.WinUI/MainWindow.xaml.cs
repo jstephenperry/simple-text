@@ -38,6 +38,12 @@ public sealed partial class MainWindow : Window
         // Mica backdrop — the standard Windows 11 window material.
         SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop();
 
+        // Extend that material into the title bar so the caption is theme-aware Mica
+        // rather than a flat white bar. AppTitleBar is the draggable region.
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+        ApplyTitleBarColors();
+
         Title = "Untitled - SimpleText";
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1100, 700));
         TrySetWindowIcon();
@@ -47,7 +53,11 @@ public sealed partial class MainWindow : Window
         TemplateCatalog.Shared.Changed += OnTemplatesChanged;
         AddOemZoomAccelerators();
 
-        RootGrid.ActualThemeChanged += (_, _) => ApplyEditorThemeToAllPanes();
+        RootGrid.ActualThemeChanged += (_, _) =>
+        {
+            ApplyEditorThemeToAllPanes();
+            ApplyTitleBarColors();
+        };
         Closed += OnWindowClosed;
         Activated += OnFirstActivated;
 
@@ -143,9 +153,11 @@ public sealed partial class MainWindow : Window
     private void UpdateTitle()
     {
         var pane = ActivePane;
-        Title = pane == null
+        var title = pane == null
             ? "SimpleText"
             : $"{(pane.IsDirty ? "*" : string.Empty)}{pane.FileName} - SimpleText";
+        Title = title;            // taskbar / Alt+Tab
+        AppTitleText.Text = title; // visible custom title bar
     }
 
     private void UpdateLineColStatus()
@@ -549,6 +561,40 @@ public sealed partial class MainWindow : Window
         };
         UpdateThemeMenuChecks();
         ApplyEditorThemeToAllPanes();
+        ApplyTitleBarColors();
+    }
+
+    /// <summary>
+    /// Themes the system caption buttons for the extended (Mica) title bar: transparent
+    /// backgrounds so the material shows through, with foreground and hover/pressed
+    /// feedback chosen for the effective light/dark theme.
+    /// </summary>
+    private void ApplyTitleBarColors()
+    {
+        if (!Microsoft.UI.Windowing.AppWindowTitleBar.IsCustomizationSupported())
+            return;
+
+        var bar = AppWindow.TitleBar;
+        bool dark = RootGrid.ActualTheme == ElementTheme.Dark;
+
+        bar.ButtonBackgroundColor = Microsoft.UI.Colors.Transparent;
+        bar.ButtonInactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
+
+        var fg = dark ? Microsoft.UI.Colors.White : Microsoft.UI.Colors.Black;
+        bar.ButtonForegroundColor = fg;
+        bar.ButtonHoverForegroundColor = fg;
+        bar.ButtonPressedForegroundColor = fg;
+        bar.ButtonInactiveForegroundColor = dark
+            ? Windows.UI.Color.FromArgb(255, 150, 150, 150)
+            : Windows.UI.Color.FromArgb(255, 120, 120, 120);
+
+        // Subtle hover/pressed wash that reads over Mica in either theme.
+        bar.ButtonHoverBackgroundColor = dark
+            ? Windows.UI.Color.FromArgb(40, 255, 255, 255)
+            : Windows.UI.Color.FromArgb(30, 0, 0, 0);
+        bar.ButtonPressedBackgroundColor = dark
+            ? Windows.UI.Color.FromArgb(60, 255, 255, 255)
+            : Windows.UI.Color.FromArgb(50, 0, 0, 0);
     }
 
     // Local adapter around the ThemeService contract so any signature drift is a one-line fix.
