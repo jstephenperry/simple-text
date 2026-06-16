@@ -41,6 +41,8 @@
         <MenuItem x:Name="ResetZoomMenuItem" Header="_Reset Zoom" InputGesture="Ctrl+D0" />
       </MenuItem>
       <MenuItem Header="_Help">
+        <MenuItem x:Name="UserManualMenuItem" Header="_User Manual" />
+        <Separator />
         <MenuItem x:Name="OpenTemplatesFolderMenuItem" Header="Open _Templates Folder" />
       </MenuItem>
     </Menu>

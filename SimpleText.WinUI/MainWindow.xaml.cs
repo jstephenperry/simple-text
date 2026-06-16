@@ -483,6 +483,19 @@ public sealed partial class MainWindow : Window
         await Launcher.LaunchFolderAsync(folder);
     }
 
+    // --- Help ---
+
+    private async void OnUserManualClick(object sender, RoutedEventArgs e)
+    {
+        // The manual is shipped next to the app (see the .csproj) and opened as a normal
+        // tab, so it renders with Markdown highlighting and supports Find/zoom.
+        var path = Path.Combine(AppContext.BaseDirectory, "Help", "SimpleText User Guide.md");
+        if (File.Exists(path))
+            await OpenPathAsync(path);
+        else
+            ShowInfoBar("User manual not found next to the app. See docs/USER-GUIDE.md in the project.");
+    }
+
     // --- Insert menu ---
 
     /// <summary>

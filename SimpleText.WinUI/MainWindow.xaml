@@ -107,6 +107,8 @@
             </MenuBarItem>
 
             <MenuBarItem Title="Help">
+                <MenuFlyoutItem Text="User Manual" Click="OnUserManualClick"/>
+                <MenuFlyoutSeparator/>
                 <MenuFlyoutItem Text="Open Templates Folder" Click="OnOpenTemplatesFolderClick"/>
             </MenuBarItem>
         </MenuBar>

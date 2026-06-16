@@ -41,6 +41,14 @@
     </Content>
   </ItemGroup>
 
+  <!-- Ship the user manual so Help > User Manual can open it in a tab. -->
+  <ItemGroup>
+    <Content Include="..\docs\USER-GUIDE.md">
+      <Link>Help\SimpleText User Guide.md</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\SimpleText.Core\SimpleText.Core.csproj" />
   </ItemGroup>

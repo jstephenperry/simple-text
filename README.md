@@ -9,8 +9,15 @@ A lightweight text editor for plain text and lightweight markup formats (Markdow
 - Document templates for productivity (notes, technical reports, proposals) and software engineering (README, changelog, ADR, bug report, pull request, design doc) — shipped as starter files and copied into your templates folder on first run, then yours to edit, add to, or delete
 - Templates are just files: drop a text file in the templates folder (open it from **Help → Open Templates Folder**) and it auto-registers in the **New from Template** menu — no restart needed. The file name becomes the template name, an immediate sub-folder becomes its category, and the extension (`.md`, `.rst`, `.adoc`, `.txt`, …) sets the editor mode. The packaged WinUI build keeps them in `Documents\SimpleText\Templates` (visible, durable, survives uninstall); the unpackaged/Avalonia build uses `%LocalAppData%/SimpleText/Templates/`
 - Insert base document elements — headings, lists, tables, code blocks, links, images, and equations — from the **Insert** menu, tailored to the current format (Markdown, AsciiDoc, reStructuredText, plus ASCII-convention elements for plain text). The fragment drops in at the cursor with the caret placed where you'll type next (like the insert palettes in LaTeX editors)
+- Appearance: light/dark/system themes, word wrap, and zoom; on Windows, a Mica title bar and selected-tab/button accents that follow your system accent color, plus a remembered window size & position
 - Session persistence — picks up where you left off, even after a crash
 - Drag-and-drop file opening
+
+## User guide
+
+Full usage docs live in **[docs/USER-GUIDE.md](docs/USER-GUIDE.md)** — and inside the app
+at **Help → User Manual**, which opens that same guide in a new tab (with Markdown
+highlighting and Find).
 
 ## Two UIs, one core
 
