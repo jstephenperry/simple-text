@@ -66,23 +66,26 @@ jobs:
           PFX_B64: ${{ secrets.SIGNING_CERTIFICATE_BASE64 }}
           PFX_PWD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
         run: |
+          New-Item -ItemType Directory -Force -Path "${{ env.PackageDir }}" | Out-Null
           $pfx = "$env:RUNNER_TEMP\sign.pfx"
           if ($env:PFX_B64) {
             [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:PFX_B64))
             $pw = $env:PFX_PWD
+            $cert = Get-PfxCertificate -FilePath $pfx -Password (ConvertTo-SecureString $pw -AsPlainText -Force)
             Write-Host "Signing with the provided code-signing certificate."
           } else {
             $pw = [guid]::NewGuid().ToString('N')
-            $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=SimpleText" `
-              -KeyUsage DigitalSignature -FriendlyName "SimpleText CI (self-signed)" `
+            $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=SimpleText" `
+              -FriendlyName "SimpleText CI (self-signed)" `
               -CertStoreLocation "Cert:\CurrentUser\My" `
-              -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3")
+              -NotAfter (Get-Date).AddYears(5)
             $sec = ConvertTo-SecureString -String $pw -Force -AsPlainText
             Export-PfxCertificate -Cert $cert -FilePath $pfx -Password $sec | Out-Null
-            New-Item -ItemType Directory -Force -Path "${{ env.PackageDir }}" | Out-Null
-            Export-Certificate -Cert $cert -FilePath "${{ env.PackageDir }}\SimpleText.cer" | Out-Null
-            Write-Warning "No SIGNING_CERTIFICATE_BASE64 secret set; used a self-signed test certificate. Users must trust SimpleText.cer before installing."
+            Write-Warning "No SIGNING_CERTIFICATE_BASE64 secret set; used a self-signed certificate. Users must trust SimpleText.cer (build/trust-cert.ps1) before installing."
           }
+
+          # Ship the public cert so users can trust the publisher (build/trust-cert.ps1).
+          Export-Certificate -Cert $cert -FilePath "${{ env.PackageDir }}\SimpleText.cer" | Out-Null
 
           foreach ($p in @('x64','ARM64')) {
             msbuild "${{ env.Project }}" `

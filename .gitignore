@@ -30,6 +30,7 @@ AppPackages/
 *.msixupload
 *.appxsym
 *.pfx
+*.cer
 
 ## Claude Code
 .claude/

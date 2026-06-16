@@ -42,6 +42,29 @@ msbuild SimpleText.WinUI/SimpleText.WinUI.csproj /p:Configuration=Release /p:Pla
   /p:GenerateAppxPackageOnBuild=true /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false
 ```
 
+#### Installing without the "this app may harm your computer" warning
+
+A self-signed MSIX still warns until its certificate is **trusted on your PC** —
+that one-time, free step is what removes the warning. From a *Developer
+PowerShell for VS*:
+
+```powershell
+pwsh build/sign-msix.ps1 -Trust          # build + self-sign + trust (UAC prompt)
+Add-AppxPackage .\AppPackages\...\SimpleText.Editor_*.msix   # or double-click it
+```
+
+Installing a downloaded [Release](../../releases) instead? Trust its certificate once:
+
+```powershell
+pwsh build/trust-cert.ps1 -Path .\SimpleText.cer
+Add-AppxPackage .\SimpleText.Editor_1.0.0.0_x64.msix
+```
+
+The cert is reused across builds, so you only trust it once. For zero per-machine
+setup (e.g. distributing to others), use a CA-issued cert such as
+[Azure Trusted Signing](https://learn.microsoft.com/azure/trusted-signing/)
+instead. Details: [`docs/msix-packaging.md`](docs/msix-packaging.md#why-a-self-signed-package-warns--and-how-to-stop-it).
+
 CI/CD builds this for you: see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 (PR/branch build checks) and [`.github/workflows/release.yml`](.github/workflows/release.yml)
 (tag `v*` → signed packages on a GitHub Release). Packaging and storage details
