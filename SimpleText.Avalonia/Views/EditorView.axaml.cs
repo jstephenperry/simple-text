@@ -135,6 +135,33 @@ public partial class EditorView : UserControl
     public (int Line, int Column) GetCaretLineColumn()
         => (Editor.TextArea.Caret.Line, Editor.TextArea.Caret.Column);
 
+    /// <summary>
+    /// Inserts <paramref name="body"/> at the caret (replacing any selection) and moves the
+    /// caret to <paramref name="caretWithinBody"/> within the inserted text. Counts as a normal
+    /// edit (marks the document dirty and re-highlights).
+    /// </summary>
+    public void InsertElement(string body, int caretWithinBody)
+    {
+        int start;
+        if (Editor.SelectionLength > 0)
+        {
+            start = Editor.SelectionStart;
+            Editor.Document.Replace(start, Editor.SelectionLength, body);
+        }
+        else
+        {
+            start = Editor.TextArea.Caret.Offset;
+            Editor.Document.Insert(start, body);
+        }
+
+        int target = Math.Clamp(start + caretWithinBody, 0, Editor.Document.TextLength);
+        Editor.Select(target, 0); // collapse any selection to the target caret
+        Editor.TextArea.Caret.Offset = target;
+        var line = Editor.Document.GetLineByOffset(target);
+        Editor.ScrollTo(line.LineNumber, 0);
+        FocusEditor();
+    }
+
     // --- File operations ---
 
     public void LoadFromFile(string path)
