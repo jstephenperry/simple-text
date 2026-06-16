@@ -4,7 +4,8 @@ namespace SimpleText.Core.Elements;
 /// Built-in palette of insertable markup elements, keyed by editor mode. Like the
 /// insert menus of LaTeX/Markdown editors, each supported format exposes a curated
 /// set of base building blocks (headings, lists, tables, code, links, math, …)
-/// grouped by category. Plain text has none.
+/// grouped by category. Plain text gets ASCII-convention blocks (underlined
+/// headings, ASCII tables, rules, …) — useful as text even though nothing renders them.
 ///
 /// <para>These are deliberately built in (not user-owned files like templates):
 /// they are small, format-specific primitives the editor provides out of the box.
@@ -14,6 +15,8 @@ namespace SimpleText.Core.Elements;
 public static class ElementCatalog
 {
     private static readonly IReadOnlyList<DocumentElement> None = [];
+
+    private static readonly IReadOnlyList<DocumentElement> PlainText = PlainTextElements();
 
     private static readonly IReadOnlyDictionary<string, IReadOnlyList<DocumentElement>> ByMode =
         new Dictionary<string, IReadOnlyList<DocumentElement>>
@@ -25,10 +28,14 @@ public static class ElementCatalog
 
     /// <summary>
     /// Elements available for <paramref name="mode"/>, in display order (grouped by
-    /// category by the caller). Empty for plain text or any unknown mode.
+    /// category by the caller). Plain text (a null mode) gets ASCII-convention
+    /// elements; an unknown non-null mode returns none.
     /// </summary>
     public static IReadOnlyList<DocumentElement> ForMode(string? mode)
-        => mode != null && ByMode.TryGetValue(mode, out var list) ? list : None;
+    {
+        if (mode == null) return PlainText;
+        return ByMode.TryGetValue(mode, out var list) ? list : None;
+    }
 
     private static DocumentElement E(string category, string name, string template)
         => DocumentElement.Create(category, name, template);
@@ -113,4 +120,50 @@ public static class ElementCatalog
         E("Math", "Inline equation", ":math:`\f`"),
         E("Math", "Equation block", ".. math::\n\n   \f"),
     ];
+
+    // Plain text has no renderer, so these are conventions/ASCII art. The table and
+    // box are built programmatically so their borders always line up.
+    private static IReadOnlyList<DocumentElement> PlainTextElements()
+    {
+        const char caret = DocumentElement.CaretMarker;
+        const int col = 10;
+
+        string Cell(string s) => " " + s + new string(' ', col - 1 - s.Length);
+
+        string rule = new string('-', 60) + "\n";
+
+        const int boxWidth = 30;
+        string boxBorder = "+" + new string('-', boxWidth + 2) + "+";
+        string box = string.Join("\n",
+            boxBorder,
+            "| " + caret + new string(' ', boxWidth) + " |",
+            boxBorder);
+
+        string sep = "+" + new string('-', col) + "+" + new string('-', col) + "+";
+        string headerCaretCell = " " + caret + "Header" + new string(' ', col - 1 - "Header".Length);
+        string table = string.Join("\n",
+            sep,
+            "|" + headerCaretCell + "|" + Cell("Header") + "|",
+            sep,
+            "|" + Cell("Cell") + "|" + Cell("Cell") + "|",
+            sep);
+
+        return
+        [
+            E("Headings", "Title (underlined)", "\fTitle\n====="),
+            E("Headings", "Subtitle (underlined)", "\fSubtitle\n--------"),
+
+            E("Lists", "Bulleted list", "- \f\n- \n- "),
+            E("Lists", "Numbered list", "1. \f\n2. \n3. "),
+            E("Lists", "Checklist", "[ ] \f\n[ ] \n[ ] "),
+
+            E("Blocks", "Horizontal rule", rule),
+            E("Blocks", "ASCII table", table),
+            E("Blocks", "Boxed text", box),
+            E("Blocks", "Block quote", "> \f"),
+
+            E("Notes", "TODO", "TODO: \f"),
+            E("Notes", "Note", "NOTE: \f"),
+        ];
+    }
 }

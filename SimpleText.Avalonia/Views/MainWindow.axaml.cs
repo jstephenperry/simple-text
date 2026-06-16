@@ -493,7 +493,7 @@ public partial class MainWindow : Window
 
     private void BuildTemplateMenu()
     {
-        NewFromTemplateMenu.Items.Clear();
+        ResetMenu(NewFromTemplateMenu.Items);
         foreach (var group in TemplateCatalog.Shared.All.GroupBy(t => t.Category))
         {
             var categoryMenu = new MenuItem { Header = group.Key };
@@ -536,7 +536,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void BuildInsertMenu()
     {
-        InsertMenu.Items.Clear();
+        ResetMenu(InsertMenu.Items);
 
         var elements = ElementCatalog.ForMode(ActivePane?.Mode);
         if (elements.Count == 0)
@@ -565,6 +565,15 @@ public partial class MainWindow : Window
 
     private void InsertActiveElement(DocumentElement element)
         => ActivePane?.InsertElement(element.Body, element.CaretOffset);
+
+    // A menu presenter can ignore a collection reset (Items.Clear()), leaving stale
+    // entries behind while still honoring later Adds — so a rebuilt menu accumulates.
+    // Removing items individually raises per-item changes it does honor.
+    private static void ResetMenu(ItemCollection items)
+    {
+        while (items.Count > 0)
+            items.RemoveAt(items.Count - 1);
+    }
 
     // --- Mode menu ---
 
