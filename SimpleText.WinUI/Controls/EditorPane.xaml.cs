@@ -513,21 +513,36 @@ public sealed partial class EditorPane : UserControl
         }
     }
 
+    // The RichEditBox template scroller is named "ContentScrollViewer"; prefer it, but fall
+    // back to the first ScrollViewer found so a template change can't silently break sync.
     private static ScrollViewer? FindScrollViewer(DependencyObject root)
     {
-        int count = VisualTreeHelper.GetChildrenCount(root);
-        for (int i = 0; i < count; i++)
+        ScrollViewer? firstFound = null;
+
+        ScrollViewer? Search(DependencyObject node)
         {
-            var child = VisualTreeHelper.GetChild(root, i);
-            if (child is ScrollViewer viewer) return viewer;
-            if (FindScrollViewer(child) is { } nested) return nested;
+            int count = VisualTreeHelper.GetChildrenCount(node);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(node, i);
+                if (child is ScrollViewer sv)
+                {
+                    firstFound ??= sv;
+                    if (sv.Name == "ContentScrollViewer") return sv;
+                }
+                if (Search(child) is { } found) return found;
+            }
+            return null;
         }
-        return null;
+
+        return Search(root) ?? firstFound;
     }
 
     /// <summary>
-    /// Measures the constant line height (NoWrap + monospace) and the top inset of the
-    /// document at zero scroll, from range rects rather than hardcoded values.
+    /// Measures the constant line height (NoWrap + monospace) and the document's top inset.
+    /// Line height is the gap between consecutive lines, which is identical in viewport or
+    /// document coordinates; the top inset is only read at zero scroll, where the two coincide
+    /// — so the gutter positions correctly no matter how the editor reports line rects.
     /// </summary>
     private void RecalibrateMetrics()
     {
@@ -538,21 +553,19 @@ public sealed partial class EditorPane : UserControl
 
             var first = doc.GetRange(0, 0);
             first.GetRect(PointOptions.AllowOffClient, out Rect firstRect, out _);
-            _topInset = firstRect.Top + verticalOffset;
 
             if (_lineStarts.Count > 1)
             {
                 var second = doc.GetRange(_lineStarts[1], _lineStarts[1]);
                 second.GetRect(PointOptions.AllowOffClient, out Rect secondRect, out _);
                 double delta = secondRect.Top - firstRect.Top;
-                if (delta > 1)
-                {
-                    _lineHeight = delta;
-                    return;
-                }
+                if (delta > 1) _lineHeight = delta;
             }
 
-            if (firstRect.Height > 1) _lineHeight = firstRect.Height;
+            if (_lineHeight <= 0 && firstRect.Height > 1) _lineHeight = firstRect.Height;
+
+            // Line 0's top equals the document inset only when unscrolled; cache it there.
+            if (verticalOffset <= 0) _topInset = firstRect.Top;
         }
         catch
         {
@@ -596,26 +609,14 @@ public sealed partial class EditorPane : UserControl
 
         double verticalOffset = _scrollViewer?.VerticalOffset ?? 0;
         double textWidth = _gutterDigits * _glyphWidth + GutterPadding / 2;
-        // Estimate the first visible line, backing up one in case RichEdit pixel-snaps
-        // line positions and the constant-advance estimate overshoots.
-        int firstLine = Math.Max(0, (int)Math.Floor((verticalOffset - _topInset) / _lineHeight) - 1);
 
-        var doc = Editor.TextDocument;
+        // Position numbers from the scroll offset and the uniform line height — no per-line
+        // hit-testing. This tracks scrolling regardless of how the editor reports line rects,
+        // and drops the per-line GetRect that stalled long documents.
+        int firstLine = Math.Max(0, (int)Math.Floor((verticalOffset - _topInset) / _lineHeight) - 1);
         for (int i = firstLine; i < _lineStarts.Count; i++)
         {
-            // Position each number from its own line rect: RichEdit line positions are
-            // pixel-snapped, so extrapolating from a single measured advance drifts.
-            double y;
-            try
-            {
-                var range = doc.GetRange(_lineStarts[i], _lineStarts[i]);
-                range.GetRect(PointOptions.AllowOffClient, out Rect lineRect, out _);
-                y = lineRect.Top;
-            }
-            catch
-            {
-                y = _topInset + i * _lineHeight - verticalOffset;
-            }
+            double y = _topInset + i * _lineHeight - verticalOffset;
             if (y > viewportHeight) break;
             if (y + _lineHeight < 0) continue;
 
