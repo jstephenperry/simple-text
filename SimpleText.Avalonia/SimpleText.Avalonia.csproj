@@ -19,6 +19,16 @@
     <PackageReference Include="TextMateSharp.Grammars" Version="2.0.4" />
   </ItemGroup>
 
+  <!-- Security override: pin the patched Tmds.DBus.Protocol. Avalonia.FreeDesktop
+       brings in 0.21.2 transitively (Linux D-Bus support), which carries a
+       high-severity advisory (GHSA-xrw6-gwf8-vvr9 / CVE-2026-39959: signal spoofing,
+       file-descriptor exhaustion, DoS). 0.21.3 is the backported fix on the same API
+       line, so it satisfies Avalonia's >=0.21.2 constraint without an API jump. Remove
+       once Avalonia references a patched version transitively. -->
+  <ItemGroup>
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
+  </ItemGroup>
+
   <ItemGroup>
     <AvaloniaResource Include="Assets/**" />
   </ItemGroup>
