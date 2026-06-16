@@ -7,8 +7,9 @@ and the caret lands where you'll type next (inside a heading marker, a link labe
 the first table cell, an equation body, …).
 
 The menu is **mode-aware**: it shows the elements for the active tab's format and
-rebuilds when you switch tabs or change the mode. Plain text has no markup, so it
-shows a disabled placeholder.
+rebuilds when you switch tabs or change the mode. Plain text has no renderer, so it
+offers ASCII-convention elements (underlined headings, ASCII tables, rules, boxed
+text) that are useful as plain text.
 
 ## Where elements live
 
@@ -21,8 +22,9 @@ provides out of the box, so they ship consistent and ready to use:
   from a template string containing a single caret marker (`\f`, form feed — it never
   appears in real markup), which it strips and converts to the offset.
 - `ElementCatalog` — the curated set per mode, keyed by `TextModes`. `ForMode(mode)`
-  returns the elements for an editor mode (empty for plain text / unknown modes),
-  ordered so a stable `GroupBy(Category)` in the UI preserves category order.
+  returns the elements for an editor mode — ASCII-convention elements for plain text
+  (a null mode), and empty for any unknown mode — ordered so a stable
+  `GroupBy(Category)` in the UI preserves category order.
 
 Each frontend exposes the same catalog: the host builds the Insert menu from
 `ElementCatalog.ForMode(activePane.Mode)` and calls `EditorView.InsertElement` /
@@ -33,6 +35,7 @@ as a normal edit (marks the document dirty and re-highlights).
 
 | Format | Categories |
 | --- | --- |
+| Plain text | Headings (underlined), Lists (incl. checklist), Blocks (ASCII table, box, rule, quote), Notes (TODO/NOTE) |
 | Markdown | Headings, Text, Lists, Blocks (incl. table, code block, rule), Links & media, Math (`$…$` / `$$…$$`) |
 | AsciiDoc | Headings, Text, Lists, Blocks (source/listing/note/quote/table/rule), Links & media, Math (`latexmath`) |
 | reStructuredText | Headings, Text, Lists, Blocks (code-block/note/literal/transition), Links & media, Math (`:math:` / `.. math::`) |
