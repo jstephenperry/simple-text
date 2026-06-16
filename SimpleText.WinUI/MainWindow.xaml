@@ -126,11 +126,12 @@
             <TextBlock Text="Find:" VerticalAlignment="Center"/>
             <TextBox x:Name="FindTextBox"
                      Width="260"
+                     AutomationProperties.Name="Find text"
                      KeyDown="OnFindTextBoxKeyDown"
                      TextChanged="OnFindTextChanged"/>
             <Button Content="Next" Click="OnFindNextClick" Style="{StaticResource AccentButtonStyle}"/>
             <Button Content="Prev" Click="OnFindPreviousClick"/>
-            <Button Content="X" Click="OnFindCloseClick"/>
+            <Button Content="X" Click="OnFindCloseClick" AutomationProperties.Name="Close find bar"/>
             <TextBlock x:Name="NoMatchesText"
                        Text="No matches"
                        VerticalAlignment="Center"

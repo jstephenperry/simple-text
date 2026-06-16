@@ -11,12 +11,14 @@
 
         <Border x:Name="GutterBorder"
                 Grid.Column="0"
-                Width="44">
+                Width="44"
+                AutomationProperties.Name="Line numbers">
             <Canvas x:Name="GutterCanvas"/>
         </Border>
 
         <RichEditBox x:Name="Editor"
                      Grid.Column="1"
+                     AutomationProperties.Name="Document text"
                      FontFamily="Cascadia Mono,Consolas"
                      FontSize="14"
                      TextWrapping="NoWrap"
