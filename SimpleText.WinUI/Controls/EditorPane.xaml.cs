@@ -92,6 +92,16 @@ public sealed partial class EditorPane : UserControl
                 Rect = new Rect(0, 0, e.NewSize.Width, e.NewSize.Height)
             };
 
+        // The gutter is a sibling of the editor, so a wheel turn over the line numbers never
+        // reaches the editor's own ScrollViewer. Forward it so scrolling works over the gutter.
+        GutterBorder.PointerWheelChanged += (_, e) =>
+        {
+            if (_scrollViewer == null) return;
+            int delta = e.GetCurrentPoint(GutterBorder).Properties.MouseWheelDelta;
+            _scrollViewer.ChangeView(null, _scrollViewer.VerticalOffset - delta, null, disableAnimation: true);
+            e.Handled = true;
+        };
+
         Editor.Loaded += (_, _) => EnsureScrollViewerHooked();
         Editor.TextChanged += (_, _) => OnEditorTextChanged();
         Editor.SelectionChanged += (_, _) => CaretMoved?.Invoke(this, EventArgs.Empty);
@@ -505,6 +515,7 @@ public sealed partial class EditorPane : UserControl
         _scrollViewer = FindScrollViewer(Editor);
         if (_scrollViewer != null)
         {
+            _highlighting.SetScrollViewer(_scrollViewer);
             _scrollViewer.ViewChanged += (_, _) =>
             {
                 RedrawGutter();

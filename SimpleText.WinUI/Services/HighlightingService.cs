@@ -25,7 +25,18 @@ internal sealed class HighlightingService
     private readonly DispatcherQueueTimer _timer;
     private ISpanHighlighter? _highlighter;
     private EditorPalette _palette = EditorPalette.Light;
+    private ScrollViewer? _scrollViewer;
     private bool _pendingPass;
+
+    /// <summary>
+    /// Bounds of the region most recently formatted. A scroll-triggered pass whose visible
+    /// region is unchanged is skipped — this is also what breaks the restore→ViewChanged→pass
+    /// feedback loop: restoring the scroll position (see <see cref="RunFormattingPass"/>) re-fires
+    /// ViewChanged, but the resulting pass sees the same region and does nothing. Reset to -1 to
+    /// force the next pass (text changed, or formatting was wiped).
+    /// </summary>
+    private int _lastStart = -1;
+    private int _lastLength = -1;
 
     /// <summary>
     /// True while a formatting pass is mutating character formats. This only guards
@@ -56,6 +67,12 @@ internal sealed class HighlightingService
 
     public void SetPalette(EditorPalette palette) => _palette = palette;
 
+    /// <summary>
+    /// Supplies the editor's content ScrollViewer so formatting passes can restore the scroll
+    /// position afterward (applying character formats otherwise scrolls the caret into view).
+    /// </summary>
+    public void SetScrollViewer(ScrollViewer scrollViewer) => _scrollViewer = scrollViewer;
+
     /// <summary>Switches the highlighter for the given TextModes constant (or null) and
     /// re-highlights immediately (or clears formatting when switching to plain text).</summary>
     public void SetMode(string? mode)
@@ -65,11 +82,15 @@ internal sealed class HighlightingService
         if (_highlighter == null)
             ResetAllFormatting();
         else
-            ApplyHighlighting();
+            ApplyHighlighting(force: true);
     }
 
     /// <summary>Schedules a re-highlight 300ms after the last text change.</summary>
-    public void NotifyTextChanged() => Restart(EditDebounce);
+    public void NotifyTextChanged()
+    {
+        _lastStart = -1; // text changed: re-highlight even if the visible bounds are unchanged
+        Restart(EditDebounce);
+    }
 
     /// <summary>Schedules a re-highlight 50ms after the last scroll.</summary>
     public void NotifyScrolled() => Restart(ScrollDebounce);
@@ -78,7 +99,7 @@ internal sealed class HighlightingService
     public void HighlightNow()
     {
         _timer.Stop();
-        ApplyHighlighting();
+        ApplyHighlighting(force: true);
     }
 
     /// <summary>
@@ -87,23 +108,12 @@ internal sealed class HighlightingService
     /// </summary>
     public void ResetAllFormatting()
     {
+        _lastStart = -1; // formatting wiped: the next highlight pass must re-apply it
         var doc = _editor.TextDocument;
         doc.GetText(TextGetOptions.None, out var raw);
         if (raw.Length == 0) return;
 
-        IsApplying = true;
-        doc.BatchDisplayUpdates();
-        doc.BeginUndoGroup();
-        try
-        {
-            ResetRange(doc.GetRange(0, raw.Length));
-        }
-        finally
-        {
-            doc.EndUndoGroup();
-            doc.ApplyDisplayUpdates();
-            IsApplying = false;
-        }
+        RunFormattingPass(doc, () => ResetRange(doc.GetRange(0, raw.Length)));
     }
 
     private void Restart(TimeSpan interval)
@@ -114,7 +124,7 @@ internal sealed class HighlightingService
         _timer.Start();
     }
 
-    private void ApplyHighlighting()
+    private void ApplyHighlighting(bool force = false)
     {
         if (_highlighter == null)
         {
@@ -140,12 +150,13 @@ internal sealed class HighlightingService
         var (start, length) = ComputeVisibleRegion(text);
         if (length <= 0) return;
 
+        // Skip a redundant scroll pass over the same region; this also stops the restore in
+        // RunFormattingPass from re-triggering itself forever while the caret is off-screen.
+        if (!force && start == _lastStart && length == _lastLength) return;
+
         var spans = _highlighter.GetHighlights(text, start, length);
 
-        IsApplying = true;
-        doc.BatchDisplayUpdates();
-        doc.BeginUndoGroup();
-        try
+        RunFormattingPass(doc, () =>
         {
             // Reset the expanded region to defaults first.
             ResetRange(doc.GetRange(start, start + length));
@@ -163,6 +174,35 @@ internal sealed class HighlightingService
                 if (bold) format.Bold = FormatEffect.On;
                 if (italic) format.Italic = FormatEffect.On;
             }
+        });
+
+        _lastStart = start;
+        _lastLength = length;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="mutate"/> as one batched, single-undo formatting group while
+    /// preserving the editor's scroll position.
+    /// <para>
+    /// Applying character formatting makes RichEditBox scroll its caret/selection back into
+    /// view. Batching suppresses the intermediate repaint but not that final scroll, so a
+    /// highlight pass triggered by scrolling a document whose caret is off-screen (e.g. at
+    /// offset 0 right after a load) would snap the view back to the caret — the "jumps back to
+    /// line 1 on every scroll" bug. Capturing the offset up front and restoring it afterward
+    /// keeps the user where they scrolled to.
+    /// </para>
+    /// </summary>
+    private void RunFormattingPass(ITextDocument doc, Action mutate)
+    {
+        double horizontalOffset = _scrollViewer?.HorizontalOffset ?? 0;
+        double verticalOffset = _scrollViewer?.VerticalOffset ?? 0;
+
+        IsApplying = true;
+        doc.BatchDisplayUpdates();
+        doc.BeginUndoGroup();
+        try
+        {
+            mutate();
         }
         finally
         {
@@ -170,6 +210,10 @@ internal sealed class HighlightingService
             doc.ApplyDisplayUpdates();
             IsApplying = false;
         }
+
+        // Undo any scroll-to-caret the formatting triggered. ChangeView clamps to the scrollable
+        // range and to the same offset is a no-op, so this is safe even when nothing moved.
+        _scrollViewer?.ChangeView(horizontalOffset, verticalOffset, null, disableAnimation: true);
     }
 
     private void ResetRange(ITextRange range)
