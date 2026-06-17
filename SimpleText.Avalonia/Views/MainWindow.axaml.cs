@@ -203,6 +203,7 @@ public partial class MainWindow : Window
         BuildTemplateMenu();
         TemplateCatalog.Shared.Changed += OnTemplatesChanged;
         OpenTemplatesFolderMenuItem.Click += async (_, _) => await OpenTemplatesFolderAsync();
+        UserManualMenuItem.Click += async (_, _) => await OpenUserManualAsync();
         OpenMenuItem.Click += async (_, _) => await OpenFileDialogAsync();
         SaveMenuItem.Click += async (_, _) => await SaveActiveAsync();
         SaveAsMenuItem.Click += async (_, _) => await SaveActiveAsAsync();
@@ -516,6 +517,19 @@ public partial class MainWindow : Window
         var path = TemplateCatalog.Shared.UserTemplatesDirectory;
         Directory.CreateDirectory(path);
         await Launcher.LaunchDirectoryInfoAsync(new DirectoryInfo(path));
+    }
+
+    /// <summary>
+    /// Opens the shipped user manual in a tab (Markdown highlighting, Find, and zoom all
+    /// apply). The file is copied next to the executable by the .csproj.
+    /// </summary>
+    private async Task OpenUserManualAsync()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Help", "SimpleText User Guide.md");
+        if (File.Exists(path))
+            await OpenPathAsync(path);
+        else
+            ShowInfoBanner("User manual not found next to the app. See docs/USER-GUIDE.md in the project.");
     }
 
     private void ApplyTemplate(DocumentTemplate template)

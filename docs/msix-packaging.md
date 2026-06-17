@@ -129,5 +129,5 @@ pwsh build/sign-msix.ps1 -ExportPfx .\SimpleText.pfx   # prints base64 + passwor
 ## Not done / follow-ups
 
 - Run the Windows App Certification Kit (WACK) before Store submission.
-- Optional: extended/custom title bar, taskbar JumpList of recent files,
-  per-scale tile polish, and a `.msixbundle` for single-file distribution.
+- Optional: taskbar JumpList of recent files, per-scale tile polish, and a
+  `.msixbundle` for single-file distribution.

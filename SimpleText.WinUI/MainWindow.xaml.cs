@@ -1,3 +1,4 @@
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -7,7 +8,9 @@ using SimpleText.Core.FileTypes;
 using SimpleText.Core.Session;
 using SimpleText.Core.Templates;
 using SimpleText.WinUI.Controls;
+using SimpleText.WinUI.Services;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Graphics;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using Windows.System;
@@ -21,6 +24,10 @@ public sealed partial class MainWindow : Window
     private const int MinFontSize = 8;
     private const int MaxFontSize = 32;
 
+    // Minimum window size in physical pixels (WinUI has no built-in minimum).
+    private const int MinWindowWidth = 500;
+    private const int MinWindowHeight = 360;
+
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _sessionTimer;
     private bool _sessionDirty;
     private string _lastFindTerm = string.Empty;
@@ -28,6 +35,11 @@ public sealed partial class MainWindow : Window
     private bool _wordWrap;
     private int _fontSizeDelta;
     private string? _themePreference;
+
+    // Tracked window placement: last non-maximized bounds, plus the maximized flag.
+    private RectInt32 _normalBounds;
+    private bool _isMaximized;
+    private bool _enforcingMinSize;
 
     private const string SessionFileName = "session.winui.json";
 
@@ -38,8 +50,15 @@ public sealed partial class MainWindow : Window
         // Mica backdrop — the standard Windows 11 window material.
         SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop();
 
+        // Extend that material into the title bar so the caption is theme-aware Mica
+        // rather than a flat white bar. AppTitleBar is the draggable region.
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+        ApplyTitleBarColors();
+
         Title = "Untitled - SimpleText";
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(1100, 700));
+        RestoreWindowPlacement();
+        AppWindow.Changed += OnAppWindowChanged;
         TrySetWindowIcon();
 
         BuildTemplateMenu();
@@ -47,7 +66,11 @@ public sealed partial class MainWindow : Window
         TemplateCatalog.Shared.Changed += OnTemplatesChanged;
         AddOemZoomAccelerators();
 
-        RootGrid.ActualThemeChanged += (_, _) => ApplyEditorThemeToAllPanes();
+        RootGrid.ActualThemeChanged += (_, _) =>
+        {
+            ApplyEditorThemeToAllPanes();
+            ApplyTitleBarColors();
+        };
         Closed += OnWindowClosed;
         Activated += OnFirstActivated;
 
@@ -143,9 +166,11 @@ public sealed partial class MainWindow : Window
     private void UpdateTitle()
     {
         var pane = ActivePane;
-        Title = pane == null
+        var title = pane == null
             ? "SimpleText"
             : $"{(pane.IsDirty ? "*" : string.Empty)}{pane.FileName} - SimpleText";
+        Title = title;            // taskbar / Alt+Tab
+        AppTitleText.Text = title; // visible custom title bar
     }
 
     private void UpdateLineColStatus()
@@ -458,6 +483,19 @@ public sealed partial class MainWindow : Window
         await Launcher.LaunchFolderAsync(folder);
     }
 
+    // --- Help ---
+
+    private async void OnUserManualClick(object sender, RoutedEventArgs e)
+    {
+        // The manual is shipped next to the app (see the .csproj) and opened as a normal
+        // tab, so it renders with Markdown highlighting and supports Find/zoom.
+        var path = Path.Combine(AppContext.BaseDirectory, "Help", "SimpleText User Guide.md");
+        if (File.Exists(path))
+            await OpenPathAsync(path);
+        else
+            ShowInfoBar("User manual not found next to the app. See docs/USER-GUIDE.md in the project.");
+    }
+
     // --- Insert menu ---
 
     /// <summary>
@@ -549,6 +587,40 @@ public sealed partial class MainWindow : Window
         };
         UpdateThemeMenuChecks();
         ApplyEditorThemeToAllPanes();
+        ApplyTitleBarColors();
+    }
+
+    /// <summary>
+    /// Themes the system caption buttons for the extended (Mica) title bar: transparent
+    /// backgrounds so the material shows through, with foreground and hover/pressed
+    /// feedback chosen for the effective light/dark theme.
+    /// </summary>
+    private void ApplyTitleBarColors()
+    {
+        if (!Microsoft.UI.Windowing.AppWindowTitleBar.IsCustomizationSupported())
+            return;
+
+        var bar = AppWindow.TitleBar;
+        bool dark = RootGrid.ActualTheme == ElementTheme.Dark;
+
+        bar.ButtonBackgroundColor = Microsoft.UI.Colors.Transparent;
+        bar.ButtonInactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
+
+        var fg = dark ? Microsoft.UI.Colors.White : Microsoft.UI.Colors.Black;
+        bar.ButtonForegroundColor = fg;
+        bar.ButtonHoverForegroundColor = fg;
+        bar.ButtonPressedForegroundColor = fg;
+        bar.ButtonInactiveForegroundColor = dark
+            ? Windows.UI.Color.FromArgb(255, 150, 150, 150)
+            : Windows.UI.Color.FromArgb(255, 120, 120, 120);
+
+        // Subtle hover/pressed wash that reads over Mica in either theme.
+        bar.ButtonHoverBackgroundColor = dark
+            ? Windows.UI.Color.FromArgb(40, 255, 255, 255)
+            : Windows.UI.Color.FromArgb(30, 0, 0, 0);
+        bar.ButtonPressedBackgroundColor = dark
+            ? Windows.UI.Color.FromArgb(60, 255, 255, 255)
+            : Windows.UI.Color.FromArgb(50, 0, 0, 0);
     }
 
     // Local adapter around the ThemeService contract so any signature drift is a one-line fix.
@@ -935,6 +1007,87 @@ public sealed partial class MainWindow : Window
         TemplateCatalog.Shared.Changed -= OnTemplatesChanged;
         _sessionTimer?.Stop();
         SaveWorkspaceSession();
+        SaveWindowPlacement();
+    }
+
+    // --- Window placement (size / position / maximized) ---
+
+    /// <summary>
+    /// Restores the saved window placement, clamped onto a connected display, or falls back
+    /// to a sensible default on first run. Re-maximizes if it was left maximized.
+    /// </summary>
+    private void RestoreWindowPlacement()
+    {
+        var saved = WindowStateService.Load();
+        if (saved is { Width: > 0, Height: > 0 })
+        {
+            var rect = ClampToWorkArea(saved.X, saved.Y, saved.Width, saved.Height);
+            AppWindow.MoveAndResize(rect);
+            _normalBounds = rect;
+            if (saved.IsMaximized && AppWindow.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.Maximize();
+                _isMaximized = true;
+            }
+        }
+        else
+        {
+            AppWindow.Resize(new SizeInt32(1100, 700));
+            _normalBounds = new RectInt32(
+                AppWindow.Position.X, AppWindow.Position.Y,
+                AppWindow.Size.Width, AppWindow.Size.Height);
+        }
+    }
+
+    private static RectInt32 ClampToWorkArea(int x, int y, int width, int height)
+    {
+        var area = DisplayArea.GetFromPoint(new PointInt32(x, y), DisplayAreaFallback.Nearest);
+        var work = area?.WorkArea ?? DisplayArea.Primary.WorkArea;
+        int w = Math.Clamp(width, MinWindowWidth, work.Width);
+        int h = Math.Clamp(height, MinWindowHeight, work.Height);
+        int cx = Math.Clamp(x, work.X, work.X + work.Width - w);
+        int cy = Math.Clamp(y, work.Y, work.Y + work.Height - h);
+        return new RectInt32(cx, cy, w, h);
+    }
+
+    private void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        if (sender.Presenter is not OverlappedPresenter presenter)
+            return;
+
+        _isMaximized = presenter.State == OverlappedPresenterState.Maximized;
+        if (_isMaximized || presenter.State == OverlappedPresenterState.Minimized)
+            return;
+
+        // Enforce the minimum size: bump back up if dragged smaller (guard re-entrancy).
+        if (args.DidSizeChange && !_enforcingMinSize)
+        {
+            int w = sender.Size.Width, h = sender.Size.Height;
+            int cw = Math.Max(w, MinWindowWidth), ch = Math.Max(h, MinWindowHeight);
+            if (cw != w || ch != h)
+            {
+                _enforcingMinSize = true;
+                try { sender.Resize(new SizeInt32(cw, ch)); }
+                finally { _enforcingMinSize = false; }
+                return;
+            }
+        }
+
+        // Remember the normal (restorable) placement for next launch.
+        _normalBounds = new RectInt32(
+            sender.Position.X, sender.Position.Y, sender.Size.Width, sender.Size.Height);
+    }
+
+    private void SaveWindowPlacement()
+    {
+        WindowStateService.Save(new WindowPlacement
+        {
+            X = _normalBounds.X,
+            Y = _normalBounds.Y,
+            Width = _normalBounds.Width,
+            Height = _normalBounds.Height,
+            IsMaximized = _isMaximized,
+        });
     }
 
     // --- Helpers ---

@@ -7,6 +7,11 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
+            <!-- Tint the selected tab with the system accent color (subtle, theme-adaptive;
+                 updates live when the user changes their Windows accent). -->
+            <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelected"
+                             Color="{ThemeResource SystemAccentColor}"
+                             Opacity="0.18" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
