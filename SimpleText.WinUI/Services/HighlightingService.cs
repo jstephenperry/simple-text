@@ -113,7 +113,7 @@ internal sealed class HighlightingService
         doc.GetText(TextGetOptions.None, out var raw);
         if (raw.Length == 0) return;
 
-        RunFormattingPass(doc, () => ResetRange(doc.GetRange(0, raw.Length)));
+        RunFormattingPass(() => ResetRange(doc.GetRange(0, raw.Length)));
     }
 
     private void Restart(TimeSpan interval)
@@ -156,7 +156,7 @@ internal sealed class HighlightingService
 
         var spans = _highlighter.GetHighlights(text, start, length);
 
-        RunFormattingPass(doc, () =>
+        RunFormattingPass(() =>
         {
             // Reset the expanded region to defaults first.
             ResetRange(doc.GetRange(start, start + length));
@@ -192,8 +192,9 @@ internal sealed class HighlightingService
     /// keeps the user where they scrolled to.
     /// </para>
     /// </summary>
-    private void RunFormattingPass(ITextDocument doc, Action mutate)
+    private void RunFormattingPass(Action mutate)
     {
+        var doc = _editor.TextDocument;
         double horizontalOffset = _scrollViewer?.HorizontalOffset ?? 0;
         double verticalOffset = _scrollViewer?.VerticalOffset ?? 0;
 
