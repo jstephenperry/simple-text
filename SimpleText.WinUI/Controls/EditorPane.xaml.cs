@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using SimpleText.Core.FileTypes;
+using SimpleText.Core.Formatting;
 using SimpleText.Core.Highlighting;
 using SimpleText.Core.Search;
 using SimpleText.Core.Session;
@@ -229,6 +230,27 @@ public sealed partial class EditorPane : UserControl
         selection.SetRange(target, target);
         selection.ScrollIntoView(PointOptions.None);
         FocusEditor();
+    }
+
+    /// <summary>
+    /// Re-aligns the table under the caret (per the active mode) so its columns line up in
+    /// the source text. Returns <c>false</c> when the caret is not inside a table the mode
+    /// can align; otherwise the async TextChanged pass marks the pane dirty and re-highlights.
+    /// </summary>
+    public bool ReformatTable()
+    {
+        if (TableFormatter.Format(GetText(), CaretPosition, _mode) is not { } edit)
+            return false;
+
+        // RichEdit stores paragraph breaks as '\r'; convert like SetText/InsertElement.
+        var rich = edit.Text.Replace("\r\n", "\r").Replace('\n', '\r');
+        var selection = Editor.TextDocument.Selection;
+        selection.SetRange(edit.Start, edit.Start + edit.Length);
+        selection.SetText(TextSetOptions.None, rich);
+
+        CaretPosition = edit.CaretOffset;
+        FocusEditor();
+        return true;
     }
 
     // --- File operations ---

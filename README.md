@@ -9,6 +9,7 @@ A lightweight text editor for plain text and lightweight markup formats (Markdow
 - Document templates for productivity (notes, technical reports, proposals) and software engineering (README, changelog, ADR, bug report, pull request, design doc) — shipped as starter files and copied into your templates folder on first run, then yours to edit, add to, or delete
 - Templates are just files: drop a text file in the templates folder (open it from **Help → Open Templates Folder**) and it auto-registers in the **New from Template** menu — no restart needed. The file name becomes the template name, an immediate sub-folder becomes its category, and the extension (`.md`, `.rst`, `.adoc`, `.txt`, …) sets the editor mode. The packaged WinUI build keeps them in `Documents\SimpleText\Templates` (visible, durable, survives uninstall); the unpackaged/Avalonia build uses `%LocalAppData%/SimpleText/Templates/`
 - Insert base document elements — headings, lists, tables, code blocks, links, images, and equations — from the **Insert** menu, tailored to the current format (Markdown, AsciiDoc, reStructuredText, plus ASCII-convention elements for plain text). The fragment drops in at the cursor with the caret placed where you'll type next (like the insert palettes in LaTeX editors)
+- Line tables up in the source with **Format → Align Table** (Ctrl+Shift+T): re-flows the table under the cursor so its columns line up as text, not just when rendered — Markdown pipe tables (keeping `:---`/`:--:`/`---:` alignment), AsciiDoc `|===` tables, reStructuredText grid & simple tables, and plain-text ASCII tables. Re-running on an aligned table is a no-op ([docs](docs/table-formatting.md))
 - Appearance: light/dark/system themes, word wrap, and zoom; on Windows, a Mica title bar and selected-tab/button accents that follow your system accent color, plus a remembered window size & position
 - Session persistence — picks up where you left off, even after a crash
 - Drag-and-drop file opening
@@ -80,7 +81,7 @@ are in [`docs/msix-packaging.md`](docs/msix-packaging.md).
 
 ## Disclaimer
 
-This is a pet project. It works on my machine. There are no tests, no CI, and no guarantees. Use at your own risk.
+This is a pet project. It works on my machine. Test coverage is light (core logic only) and there are no guarantees. Use at your own risk.
 
 ## AI Disclosure
 

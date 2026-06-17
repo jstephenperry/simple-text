@@ -3,7 +3,7 @@
 SimpleText is a lightweight editor for plain text and lightweight markup formats —
 Markdown, AsciiDoc, and reStructuredText. It does tabbed editing with line numbers,
 semantic syntax highlighting, document templates, an Insert menu of ready-made
-markup, find, themes, and crash-safe session restore.
+markup, table alignment, find, themes, and crash-safe session restore.
 
 > Tip: you're probably reading this inside SimpleText (**Help → User Manual**). It's
 > just a Markdown file open in a tab, so syntax highlighting, Find (Ctrl+F), and zoom
@@ -13,7 +13,7 @@ markup, find, themes, and crash-safe session restore.
 
 - **Title bar** — the document name. On Windows it uses the Mica material and follows
   your light/dark theme.
-- **Menu bar** — File, Mode, Insert, View, Help.
+- **Menu bar** — File, Mode, Insert, Format, View, Help.
 - **Tabs** — one document per tab; a **+** button (or Ctrl+N) opens a new one.
 - **Editor** — with a line-number gutter on the left.
 - **Status bar** — line/column, file name, current format, and encoding (UTF-8).
@@ -83,6 +83,23 @@ The menu is **format-aware** — it shows the elements for the current tab's mod
 | reStructuredText | titles, bold/italic/code, lists, code-block/note/literal/transition, link, image, `:math:` / `.. math::` |
 | Plain text | underlined titles, bulleted/numbered/check lists, an aligned ASCII table, boxed text, a rule, block quote, TODO/NOTE |
 
+## Format — line up tables
+
+**Format → Align Table** (**Ctrl+Shift+T**) re-flows the table **under the cursor** so its
+columns line up in the source text — not just when rendered. Put the caret anywhere inside a
+table and run it: cell text is preserved, and only the padding, separators, and borders are
+rewritten. Running it on an already-aligned table changes nothing, so it's safe to mash.
+
+It understands the table style of each mode:
+
+- **Markdown** — pipe tables, preserving the `:---` / `:--:` / `---:` alignment markers.
+- **AsciiDoc** — `|===` tables written one row per line.
+- **reStructuredText** — both grid tables (`+---+` borders) and simple tables (`===` rules).
+- **Plain text** — ASCII grid tables (the kind the **Insert** menu drops in).
+
+If the cursor isn't inside a table the current mode recognizes, a banner says so. Details:
+[`docs/table-formatting.md`](table-formatting.md).
+
 ## Finding text
 
 | Action | How |
@@ -125,6 +142,7 @@ the per-app store.
 | Ctrl+S | Save |
 | Ctrl+Shift+S | Save As |
 | Ctrl+W | Close tab |
+| Ctrl+Shift+T | Align the table under the cursor |
 | Ctrl+F | Find |
 | F3 / Shift+F3 | Find next / previous |
 | Esc | Close the find bar |
@@ -134,7 +152,8 @@ the per-app store.
 ## Platforms
 
 SimpleText ships in two builds that share the same core feature set (tabs, session
-restore, modes & highlighting, templates, Insert, find, themes, word wrap, zoom):
+restore, modes & highlighting, templates, Insert, table alignment, find, themes, word
+wrap, zoom):
 
 - **WinUI 3** — Windows-native, packaged as MSIX. Adds the Mica title bar, accent
   integration, and window-placement memory described above.

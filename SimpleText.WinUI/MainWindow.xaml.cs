@@ -533,6 +533,22 @@ public sealed partial class MainWindow : Window
     private void InsertActiveElement(DocumentElement element)
         => ActivePane?.InsertElement(element.Body, element.CaretOffset);
 
+    // --- Format menu ---
+
+    private void OnAlignTableClick(object sender, RoutedEventArgs e) => AlignActiveTable();
+
+    /// <summary>
+    /// Re-aligns the table under the caret in the active pane. If the caret is not inside a
+    /// table the mode can align, hint how to use it rather than failing silently.
+    /// </summary>
+    private void AlignActiveTable()
+    {
+        if (ActivePane is not { } pane)
+            return;
+        if (!pane.ReformatTable())
+            ShowInfoBar("No table at the cursor to align. Put the caret inside a table and try again.");
+    }
+
     // A MenuBar/MenuFlyout presenter can ignore a collection reset (Items.Clear()),
     // leaving stale entries behind while still honoring later Adds — so a rebuilt menu
     // accumulates. Removing items individually raises per-item changes it does honor.

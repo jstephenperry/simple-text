@@ -81,6 +81,14 @@
 
             <MenuBarItem x:Name="InsertMenu" Title="Insert"/>
 
+            <MenuBarItem Title="Format">
+                <MenuFlyoutItem x:Name="AlignTableItem" Text="Align Table" Click="OnAlignTableClick" KeyboardAcceleratorTextOverride="Ctrl+Shift+T">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="T" Modifiers="Control,Shift"/>
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+            </MenuBarItem>
+
             <MenuBarItem Title="View">
                 <MenuFlyoutSubItem Text="Theme">
                     <RadioMenuFlyoutItem x:Name="ThemeSystemItem" Text="System" GroupName="ThemeGroup" IsChecked="True" Click="OnThemeSystemClick"/>

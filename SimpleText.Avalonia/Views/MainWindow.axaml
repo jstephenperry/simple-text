@@ -28,6 +28,9 @@
         <MenuItem x:Name="ModeRst" Header="_reStructuredText" />
       </MenuItem>
       <MenuItem x:Name="InsertMenu" Header="_Insert" />
+      <MenuItem Header="_Format">
+        <MenuItem x:Name="AlignTableMenuItem" Header="_Align Table" InputGesture="Ctrl+Shift+T" />
+      </MenuItem>
       <MenuItem Header="_View">
         <MenuItem Header="_Theme">
           <MenuItem x:Name="ThemeSystem" Header="Follow _System" />
