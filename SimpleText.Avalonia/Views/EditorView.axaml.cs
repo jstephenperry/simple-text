@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Styling;
 using AvaloniaEdit.TextMate;
 using SimpleText.Core.FileTypes;
+using SimpleText.Core.Formatting;
 using SimpleText.Core.Highlighting;
 using SimpleText.Core.Search;
 using SimpleText.Core.Session;
@@ -160,6 +161,21 @@ public partial class EditorView : UserControl
         var line = Editor.Document.GetLineByOffset(target);
         Editor.ScrollTo(line.LineNumber, 0);
         FocusEditor();
+    }
+
+    /// <summary>
+    /// Re-aligns the table under the caret (per the active mode) so its columns line up in
+    /// the source text. Returns <c>false</c> when the caret is not inside a table the mode
+    /// can align; otherwise counts as a normal edit (marks the document dirty, re-highlights).
+    /// </summary>
+    public bool ReformatTable()
+    {
+        if (TableFormatter.Format(GetText(), CaretOffset, _mode) is not { } edit)
+            return false;
+        Editor.Document.Replace(edit.Start, edit.Length, edit.Text);
+        CaretOffset = edit.CaretOffset;
+        FocusEditor();
+        return true;
     }
 
     // --- File operations ---

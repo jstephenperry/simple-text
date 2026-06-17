@@ -220,6 +220,9 @@ public partial class MainWindow : Window
         ModeAsciiDoc.Click += (_, _) => SetActiveMode(TextModes.AsciiDoc);
         ModeRst.Click += (_, _) => SetActiveMode(TextModes.ReStructuredText);
 
+        // Format menu
+        AlignTableMenuItem.Click += (_, _) => AlignActiveTable();
+
         // View menu — theme
         ThemeSystem.Click += (_, _) => SetTheme(null);
         ThemeLight.Click += (_, _) => SetTheme(ThemeVariant.Light);
@@ -580,6 +583,20 @@ public partial class MainWindow : Window
     private void InsertActiveElement(DocumentElement element)
         => ActivePane?.InsertElement(element.Body, element.CaretOffset);
 
+    // --- Format menu ---
+
+    /// <summary>
+    /// Re-aligns the table under the caret in the active pane. If the caret is not inside a
+    /// table the mode can align, hint how to use it rather than failing silently.
+    /// </summary>
+    private void AlignActiveTable()
+    {
+        if (ActivePane is not { } pane)
+            return;
+        if (!pane.ReformatTable())
+            ShowInfoBanner("No table at the cursor to align. Put the caret inside a table and try again.");
+    }
+
     // A menu presenter can ignore a collection reset (Items.Clear()), leaving stale
     // entries behind while still honoring later Adds — so a rebuilt menu accumulates.
     // Removing items individually raises per-item changes it does honor.
@@ -883,6 +900,10 @@ public partial class MainWindow : Window
         else if (ctrlShift && e.Key == Key.S)
         {
             _ = SaveActiveAsAsync(); e.Handled = true;
+        }
+        else if (ctrlShift && e.Key == Key.T)
+        {
+            AlignActiveTable(); e.Handled = true;
         }
         else if (ctrl && e.Key == Key.W)
         {

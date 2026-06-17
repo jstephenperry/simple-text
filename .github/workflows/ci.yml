@@ -14,10 +14,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Fast, cross-platform sanity check of the shared core (where most logic lives).
-  # The Avalonia frontend is intentionally excluded from CI.
+  # Fast, cross-platform sanity check of the shared core (where most logic lives) plus its
+  # unit tests. The Avalonia frontend is intentionally excluded from CI.
   core:
-    name: Build core
+    name: Build & test core
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +25,7 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet build SimpleText.Core/SimpleText.Core.csproj -c Release
+      - run: dotnet test SimpleText.Core.Tests/SimpleText.Core.Tests.csproj -c Release
 
   # Render the MSIX visual assets from the brand SVG (reliable tooling on Linux).
   assets:
