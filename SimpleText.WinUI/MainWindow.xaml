@@ -63,6 +63,8 @@
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator/>
+                <MenuFlyoutItem Text="Export to PDF..." Click="OnExportToPdfClick"/>
+                <MenuFlyoutSeparator/>
                 <MenuFlyoutItem Text="Close Tab" Click="OnCloseTabClick">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="W" Modifiers="Control"/>

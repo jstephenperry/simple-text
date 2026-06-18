@@ -290,6 +290,78 @@ public sealed partial class MainWindow : Window
             await SavePaneAsAsync(pane);
     }
 
+    private async void OnExportToPdfClick(object sender, RoutedEventArgs e)
+    {
+        if (ActivePane is not { } pane) return;
+        
+        var mode = pane.Mode;
+        if (mode != TextModes.Markdown && mode != TextModes.AsciiDoc)
+        {
+            await ShowErrorDialogAsync("Export to PDF is only supported for Markdown and AsciiDoc.");
+            return;
+        }
+
+        if (pane.IsDirty || string.IsNullOrEmpty(pane.FilePath))
+        {
+            var saved = await SavePaneAsync(pane);
+            if (!saved) return;
+        }
+
+        var picker = new FileSavePicker
+        {
+            SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+            SuggestedFileName = Path.GetFileNameWithoutExtension(pane.FilePath) + ".pdf",
+        };
+        InitializePickerWithWindow(picker);
+        picker.FileTypeChoices.Add("PDF Document", new List<string> { ".pdf" });
+
+        var file = await picker.PickSaveFileAsync();
+        if (file == null) return;
+
+        string scriptName = mode == TextModes.Markdown ? "ExportMarkdownToPdf.ps1" : "ExportAsciiDocToPdf.ps1";
+        string scriptPath = Path.Combine(AppContext.BaseDirectory, "Scripts", scriptName);
+
+        if (!File.Exists(scriptPath))
+        {
+            await ShowErrorDialogAsync($"Export script not found: {scriptPath}");
+            return;
+        }
+
+        try
+        {
+            var startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\" -InputFile \"{pane.FilePath}\" -OutputFile \"{file.Path}\"",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardError = true
+            };
+
+            ShowInfoBar($"Exporting {Path.GetFileName(pane.FilePath)} to PDF...", InfoBarSeverity.Informational);
+
+            using var process = System.Diagnostics.Process.Start(startInfo);
+            if (process != null)
+            {
+                await process.WaitForExitAsync();
+                if (process.ExitCode != 0)
+                {
+                    SessionInfoBar.IsOpen = false;
+                    string error = await process.StandardError.ReadToEndAsync();
+                    await ShowErrorDialogAsync($"Export failed:\n{error}");
+                }
+                else
+                {
+                    ShowInfoBar($"Successfully exported to {file.Name}", InfoBarSeverity.Success);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await ShowErrorDialogAsync($"Export failed:\n{ex.Message}");
+        }
+    }
+
     private async void OnCloseTabClick(object sender, RoutedEventArgs e)
     {
         if (Tabs.SelectedItem is TabViewItem tab)
@@ -449,16 +521,47 @@ public sealed partial class MainWindow : Window
     private void BuildTemplateMenu()
     {
         ResetMenu(NewFromTemplateMenu.Items);
+        var categoryNodes = new Dictionary<string, MenuFlyoutSubItem>();
+
+        MenuFlyoutSubItem GetOrCreateCategory(string categoryPath)
+        {
+            if (categoryNodes.TryGetValue(categoryPath, out var existing))
+                return existing;
+
+            var parts = categoryPath.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+            
+            MenuFlyoutSubItem currentMenu = null;
+            string currentPath = "";
+            
+            foreach (var part in parts)
+            {
+                currentPath = string.IsNullOrEmpty(currentPath) ? part : currentPath + Path.DirectorySeparatorChar + part;
+                
+                if (!categoryNodes.TryGetValue(currentPath, out var subMenu))
+                {
+                    subMenu = new MenuFlyoutSubItem { Text = part };
+                    categoryNodes[currentPath] = subMenu;
+                    
+                    if (currentMenu == null)
+                        NewFromTemplateMenu.Items.Add(subMenu);
+                    else
+                        currentMenu.Items.Add(subMenu);
+                }
+                currentMenu = subMenu;
+            }
+            
+            return currentMenu;
+        }
+
         foreach (var group in TemplateCatalog.Shared.All.GroupBy(t => t.Category))
         {
-            var categoryMenu = new MenuFlyoutSubItem { Text = group.Key };
+            var categoryMenu = GetOrCreateCategory(group.Key);
             foreach (var template in group)
             {
                 var item = new MenuFlyoutItem { Text = template.Variant };
                 item.Click += (_, _) => ApplyTemplate(template);
                 categoryMenu.Items.Add(item);
             }
-            NewFromTemplateMenu.Items.Add(categoryMenu);
         }
     }
 
@@ -989,9 +1092,10 @@ public sealed partial class MainWindow : Window
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
 
-    private void ShowInfoBar(string message)
+    private void ShowInfoBar(string message, InfoBarSeverity severity = InfoBarSeverity.Warning)
     {
         SessionInfoBar.Message = message;
+        SessionInfoBar.Severity = severity;
         SessionInfoBar.IsOpen = true;
     }
 

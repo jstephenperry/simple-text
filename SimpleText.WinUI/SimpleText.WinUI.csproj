@@ -59,6 +59,13 @@
     </Content>
   </ItemGroup>
 
+  <!-- Ship the conversion scripts. -->
+  <ItemGroup>
+    <Content Include="Scripts\**\*.ps1">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1839" />

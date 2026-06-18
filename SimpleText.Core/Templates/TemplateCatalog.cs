@@ -134,12 +134,11 @@ public sealed class TemplateCatalog : IDisposable
             .ToList();
     }
 
-    /// <summary>Immediate sub-folder name, or <see cref="DefaultUserCategory"/> for files in the root.</summary>
     private static string DeriveCategory(string root, string file)
     {
         var relative = Path.GetRelativePath(root, file);
-        var separator = relative.IndexOfAny([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]);
-        return separator < 0 ? DefaultUserCategory : relative[..separator];
+        var dir = Path.GetDirectoryName(relative);
+        return string.IsNullOrEmpty(dir) ? DefaultUserCategory : dir;
     }
 
     /// <summary>Drop the single conventional end-of-file newline so applied templates have no trailing blank line.</summary>

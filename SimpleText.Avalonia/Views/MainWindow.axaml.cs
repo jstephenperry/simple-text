@@ -498,9 +498,41 @@ public partial class MainWindow : Window
     private void BuildTemplateMenu()
     {
         ResetMenu(NewFromTemplateMenu.Items);
+        var categoryNodes = new Dictionary<string, MenuItem>();
+
+        MenuItem GetOrCreateCategory(string categoryPath)
+        {
+            if (categoryNodes.TryGetValue(categoryPath, out var existing))
+                return existing;
+
+            var parts = categoryPath.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+            
+            MenuItem currentMenu = null;
+            string currentPath = "";
+            
+            foreach (var part in parts)
+            {
+                currentPath = string.IsNullOrEmpty(currentPath) ? part : currentPath + Path.DirectorySeparatorChar + part;
+                
+                if (!categoryNodes.TryGetValue(currentPath, out var subMenu))
+                {
+                    subMenu = new MenuItem { Header = part };
+                    categoryNodes[currentPath] = subMenu;
+                    
+                    if (currentMenu == null)
+                        NewFromTemplateMenu.Items.Add(subMenu);
+                    else
+                        currentMenu.Items.Add(subMenu);
+                }
+                currentMenu = subMenu;
+            }
+            
+            return currentMenu;
+        }
+
         foreach (var group in TemplateCatalog.Shared.All.GroupBy(t => t.Category))
         {
-            var categoryMenu = new MenuItem { Header = group.Key };
+            var categoryMenu = GetOrCreateCategory(group.Key);
             foreach (var template in group)
             {
                 var item = new MenuItem { Header = template.Variant };
@@ -508,7 +540,6 @@ public partial class MainWindow : Window
                 item.Click += (_, _) => ApplyTemplate(captured);
                 categoryMenu.Items.Add(item);
             }
-            NewFromTemplateMenu.Items.Add(categoryMenu);
         }
     }
 
