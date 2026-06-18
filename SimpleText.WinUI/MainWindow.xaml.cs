@@ -599,6 +599,22 @@ public sealed partial class MainWindow : Window
             ShowInfoBar("User manual not found next to the app. See docs/USER-GUIDE.md in the project.");
     }
 
+    private async void OnCheckForUpdatesClick(object sender, RoutedEventArgs e)
+    {
+        var update = await UpdateService.CheckForUpdatesAsync();
+        if (update.IsUpdateAvailable)
+        {
+            ShowInfoBar($"A new version ({update.Version}) is available!", 
+                InfoBarSeverity.Informational, 
+                "Update Now", 
+                update.DownloadUrl);
+        }
+        else
+        {
+            ShowInfoBar("You are on the latest version.", InfoBarSeverity.Success);
+        }
+    }
+
     // --- Insert menu ---
 
     /// <summary>

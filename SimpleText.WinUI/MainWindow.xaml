@@ -120,6 +120,8 @@
                 <MenuFlyoutItem Text="User Manual" Click="OnUserManualClick"/>
                 <MenuFlyoutSeparator/>
                 <MenuFlyoutItem Text="Open Templates Folder" Click="OnOpenTemplatesFolderClick"/>
+                <MenuFlyoutSeparator/>
+                <MenuFlyoutItem Text="Check for Updates..." Click="OnCheckForUpdatesClick"/>
             </MenuBarItem>
         </MenuBar>
 
