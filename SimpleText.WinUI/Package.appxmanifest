@@ -17,7 +17,7 @@
   <Identity
     Name="SimpleText.Editor"
     Publisher="CN=SimpleText"
-    Version="1.0.0.6" />
+    Version="1.0.0.7" />
 
   <Properties>
     <DisplayName>SimpleText</DisplayName>

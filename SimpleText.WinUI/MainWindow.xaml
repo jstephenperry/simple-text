@@ -131,7 +131,7 @@
                  IsClosable="True"
                  Severity="Warning">
             <InfoBar.ActionButton>
-                <HyperlinkButton x:Name="SessionInfoBarAction" Visibility="Collapsed" Content="Update Now" />
+                <Button x:Name="SessionInfoBarAction" Visibility="Collapsed" Content="Update Now" Click="OnSessionInfoBarActionClick" />
             </InfoBar.ActionButton>
         </InfoBar>
 

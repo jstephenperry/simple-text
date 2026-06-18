@@ -1109,6 +1109,7 @@ public sealed partial class MainWindow : Window
     private static extern bool SetForegroundWindow(IntPtr hWnd);
 
     private int _infoBarToken;
+    private string? _currentActionUrl;
 
     private async void ShowInfoBar(string message, InfoBarSeverity severity = InfoBarSeverity.Warning, string? actionText = null, string? actionUrl = null, int autoHideSeconds = 0)
     {
@@ -1117,12 +1118,13 @@ public sealed partial class MainWindow : Window
         
         if (!string.IsNullOrEmpty(actionText) && !string.IsNullOrEmpty(actionUrl))
         {
+            _currentActionUrl = actionUrl;
             SessionInfoBarAction.Content = actionText;
-            SessionInfoBarAction.NavigateUri = new Uri(actionUrl);
             SessionInfoBarAction.Visibility = Visibility.Visible;
         }
         else
         {
+            _currentActionUrl = null;
             SessionInfoBarAction.Visibility = Visibility.Collapsed;
         }
         
@@ -1135,6 +1137,25 @@ public sealed partial class MainWindow : Window
             if (_infoBarToken == token)
             {
                 SessionInfoBar.IsOpen = false;
+            }
+        }
+    }
+
+    private void OnSessionInfoBarActionClick(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(_currentActionUrl))
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = _currentActionUrl,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                ShowInfoBar($"Failed to launch update: {ex.Message}", InfoBarSeverity.Error, autoHideSeconds: 10);
             }
         }
     }
