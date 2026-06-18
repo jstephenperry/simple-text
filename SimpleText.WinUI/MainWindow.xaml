@@ -127,7 +127,11 @@
                  Grid.Row="2"
                  IsOpen="False"
                  IsClosable="True"
-                 Severity="Warning"/>
+                 Severity="Warning">
+            <InfoBar.ActionButton>
+                <HyperlinkButton x:Name="SessionInfoBarAction" Visibility="Collapsed" Content="Update Now" />
+            </InfoBar.ActionButton>
+        </InfoBar>
 
         <StackPanel x:Name="FindBar"
                     Grid.Row="3"

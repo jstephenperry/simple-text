@@ -1092,10 +1092,22 @@ public sealed partial class MainWindow : Window
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
 
-    private void ShowInfoBar(string message, InfoBarSeverity severity = InfoBarSeverity.Warning)
+    private void ShowInfoBar(string message, InfoBarSeverity severity = InfoBarSeverity.Warning, string? actionText = null, string? actionUrl = null)
     {
         SessionInfoBar.Message = message;
         SessionInfoBar.Severity = severity;
+        
+        if (!string.IsNullOrEmpty(actionText) && !string.IsNullOrEmpty(actionUrl))
+        {
+            SessionInfoBarAction.Content = actionText;
+            SessionInfoBarAction.NavigateUri = new Uri(actionUrl);
+            SessionInfoBarAction.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            SessionInfoBarAction.Visibility = Visibility.Collapsed;
+        }
+        
         SessionInfoBar.IsOpen = true;
     }
 
@@ -1113,12 +1125,21 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void OnFirstActivated(object sender, WindowActivatedEventArgs args)
+    private async void OnFirstActivated(object sender, WindowActivatedEventArgs args)
     {
         if (args.WindowActivationState == WindowActivationState.Deactivated)
             return;
         Activated -= OnFirstActivated;
         ActivePane?.FocusEditor();
+
+        var update = await UpdateService.CheckForUpdatesAsync();
+        if (update.IsUpdateAvailable)
+        {
+            ShowInfoBar($"A new version ({update.Version}) is available!", 
+                InfoBarSeverity.Informational, 
+                "Update Now", 
+                update.DownloadUrl);
+        }
     }
 
     private void OnWindowClosed(object sender, WindowEventArgs args)
