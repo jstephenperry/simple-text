@@ -54,6 +54,10 @@ public static class UpdateService
                             if (name != null && name.EndsWith(".msix", StringComparison.OrdinalIgnoreCase))
                             {
                                 downloadUrl = asset.GetProperty("browser_download_url").GetString() ?? htmlUrl;
+                                if (downloadUrl.EndsWith(".msix", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    downloadUrl = $"ms-appinstaller:?source={downloadUrl}";
+                                }
                                 break;
                             }
                         }
