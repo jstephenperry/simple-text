@@ -607,11 +607,11 @@ public sealed partial class MainWindow : Window
             ShowInfoBar($"A new version ({update.Version}) is available!", 
                 InfoBarSeverity.Informational, 
                 "Update Now", 
-                update.DownloadUrl);
+                update.DownloadUrl, 30);
         }
         else
         {
-            ShowInfoBar("You are on the latest version.", InfoBarSeverity.Success);
+            ShowInfoBar("You are on the latest version.", InfoBarSeverity.Success, autoHideSeconds: 5);
         }
     }
 
@@ -1108,7 +1108,9 @@ public sealed partial class MainWindow : Window
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
 
-    private void ShowInfoBar(string message, InfoBarSeverity severity = InfoBarSeverity.Warning, string? actionText = null, string? actionUrl = null)
+    private int _infoBarToken;
+
+    private async void ShowInfoBar(string message, InfoBarSeverity severity = InfoBarSeverity.Warning, string? actionText = null, string? actionUrl = null, int autoHideSeconds = 0)
     {
         SessionInfoBar.Message = message;
         SessionInfoBar.Severity = severity;
@@ -1125,6 +1127,16 @@ public sealed partial class MainWindow : Window
         }
         
         SessionInfoBar.IsOpen = true;
+
+        if (autoHideSeconds > 0)
+        {
+            var token = ++_infoBarToken;
+            await Task.Delay(TimeSpan.FromSeconds(autoHideSeconds));
+            if (_infoBarToken == token)
+            {
+                SessionInfoBar.IsOpen = false;
+            }
+        }
     }
 
     private void TrySetWindowIcon()
@@ -1154,7 +1166,7 @@ public sealed partial class MainWindow : Window
             ShowInfoBar($"A new version ({update.Version}) is available!", 
                 InfoBarSeverity.Informational, 
                 "Update Now", 
-                update.DownloadUrl);
+                update.DownloadUrl, 30);
         }
     }
 
