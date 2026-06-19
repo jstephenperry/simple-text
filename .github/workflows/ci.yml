@@ -14,6 +14,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Guard the single-source version: the WinUI MSIX manifest must stay in sync with version.txt
+  # (4-part = version.txt + ".0"). Catches a hand-edited version that skipped build/bump-version.sh.
+  version-check:
+    name: Version consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: |
+          ver="$(tr -d '[:space:]' < version.txt)"
+          man="$(grep -oE '^[[:space:]]*Version="[0-9.]+"' SimpleText.WinUI/Package.appxmanifest | grep -oE '[0-9.]+' | head -1)"
+          echo "version.txt=$ver  MSIX manifest=$man  (expected ${ver}.0)"
+          if [ "$man" != "${ver}.0" ]; then
+            echo "::error::MSIX manifest version ($man) != version.txt (${ver}.0). Run build/bump-version.sh to sync." >&2
+            exit 1
+          fi
+
   # Fast, cross-platform sanity check of the shared core (where most logic lives) plus its
   # unit tests.
   core:

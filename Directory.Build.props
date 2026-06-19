@@ -1,0 +1,12 @@
+<Project>
+
+  <!-- Single source of truth for the application version (3-part SemVer), read from version.txt.
+       Bump it with build/bump-version.sh, which also syncs the WinUI MSIX manifest's required
+       4-part Identity version. Every .NET project picks this up as <Version>; the Avalonia
+       assembly/Velopack release and the WinUI assembly all derive from the same file. -->
+  <PropertyGroup>
+    <SimpleTextVersion>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)version.txt').Trim())</SimpleTextVersion>
+    <Version>$(SimpleTextVersion)</Version>
+  </PropertyGroup>
+
+</Project>

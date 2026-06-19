@@ -93,6 +93,24 @@ CI/CD builds this for you: see [`.github/workflows/ci.yml`](.github/workflows/ci
 (tag `v*` → signed packages on a GitHub Release). Packaging and storage details
 are in [`docs/msix-packaging.md`](docs/msix-packaging.md).
 
+### Versioning
+
+There is one source of truth for the version: **`version.txt`** at the repo root (3-part
+SemVer, e.g. `1.0.1`). Every .NET project reads it via [`Directory.Build.props`](Directory.Build.props),
+and the Avalonia/Velopack release packs from it. Windows requires a 4-part package version, so
+the WinUI MSIX manifest carries `version.txt + ".0"` (e.g. `1.0.1.0`).
+
+Bump the version with the helper, which increments `version.txt` **and** syncs the manifest:
+
+```
+build/bump-version.sh            # patch: 1.0.1 -> 1.0.2
+build/bump-version.sh minor      # 1.0.2 -> 1.1.0
+build/bump-version.sh set 2.0.0  # explicit
+```
+
+CI (`version-check`) fails if the manifest ever drifts from `version.txt`. To cut a release,
+bump, commit, then tag `v<version>.0` (e.g. `v1.0.2.0`) and push the tag.
+
 ## Disclaimer
 
 This is a pet project. It works on my machine. Test coverage is light (core logic only) and there are no guarantees. Use at your own risk.
