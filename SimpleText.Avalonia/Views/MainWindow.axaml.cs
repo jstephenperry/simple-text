@@ -204,6 +204,7 @@ public partial class MainWindow : Window
         TemplateCatalog.Shared.Changed += OnTemplatesChanged;
         OpenTemplatesFolderMenuItem.Click += async (_, _) => await OpenTemplatesFolderAsync();
         UserManualMenuItem.Click += async (_, _) => await OpenUserManualAsync();
+        CheckForUpdatesMenuItem.Click += async (_, _) => await CheckForUpdatesAsync(userInitiated: true);
         OpenMenuItem.Click += async (_, _) => await OpenFileDialogAsync();
         SaveMenuItem.Click += async (_, _) => await SaveActiveAsync();
         SaveAsMenuItem.Click += async (_, _) => await SaveActiveAsAsync();
@@ -236,6 +237,7 @@ public partial class MainWindow : Window
 
         // Info banner
         InfoBannerClose.Click += (_, _) => InfoBanner.IsVisible = false;
+        InfoBannerAction.Click += OnInfoBannerActionClick;
 
         // Find bar
         FindNextButton.Click += (_, _) => FindNext();
@@ -285,6 +287,9 @@ public partial class MainWindow : Window
 
         UpdateAllActiveUi();
         ActivePane?.FocusEditor();
+
+        // Quietly check for a newer release on startup; only surfaces a banner if one exists.
+        _ = CheckForUpdatesAsync(userInitiated: false);
     }
 
     // --- Startup hooks (called by App before the window is shown) ---
@@ -1070,10 +1075,70 @@ public partial class MainWindow : Window
         await tcs.Task;
     }
 
-    private void ShowInfoBanner(string message)
+    private void ShowInfoBanner(string message, string? actionText = null, Func<Task>? action = null)
     {
         InfoBannerText.Text = message;
+
+        if (!string.IsNullOrEmpty(actionText) && action != null)
+        {
+            _bannerAction = action;
+            InfoBannerAction.Content = actionText;
+            InfoBannerAction.IsVisible = true;
+        }
+        else
+        {
+            _bannerAction = null;
+            InfoBannerAction.IsVisible = false;
+        }
+
         InfoBanner.IsVisible = true;
+    }
+
+    // --- Updates ---
+
+    private Func<Task>? _bannerAction;
+
+    /// <summary>
+    /// Checks GitHub for a newer release via Velopack. A found update shows a banner whose
+    /// button downloads and applies it in place and restarts the app. The check fails silently
+    /// on network errors and is a no-op for non-installed builds. When <paramref name="userInitiated"/>
+    /// is true (Help &gt; Check for Updates) the "you're up to date" outcome is also reported so
+    /// the menu action always gives feedback.
+    /// </summary>
+    private async Task CheckForUpdatesAsync(bool userInitiated)
+    {
+        var update = await UpdateService.CheckForUpdatesAsync();
+
+        if (update != null)
+            ShowInfoBanner(
+                $"A new version ({update.TargetFullRelease.Version}) is available.",
+                actionText: "Restart & Update",
+                action: () => ApplyUpdateAsync(update));
+        else if (userInitiated)
+            ShowInfoBanner("You are on the latest version.");
+    }
+
+    private async Task ApplyUpdateAsync(global::Velopack.UpdateInfo update)
+    {
+        // DownloadAndApply restarts the app on success and never returns; swap the action for a
+        // progress message so the button can't be clicked twice mid-update.
+        ShowInfoBanner("Downloading update… the app will restart when it's ready.");
+        await UpdateService.DownloadAndApplyAsync(update);
+    }
+
+    private async void OnInfoBannerActionClick(object? sender, global::Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var action = _bannerAction;
+        if (action == null)
+            return;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            ShowInfoBanner($"Update failed: {ex.Message}");
+        }
     }
 
     // --- Helpers ---
