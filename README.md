@@ -26,7 +26,7 @@ highlighting and Find).
 - **SimpleText.Avalonia** — Cross-platform (Windows/macOS/Linux), built on [Avalonia UI](https://avaloniaui.net/) with [AvaloniaEdit](https://github.com/AvaloniaUI/AvaloniaEdit) and TextMate grammars
 - **SimpleText.Core** — Shared library (session management, file types, search, templates, and the semantic highlighting engine: Markdig + TextMate span parsers behind a UI-agnostic `ISpanHighlighter`)
 
-Both frontends share the same feature set: Notepad++-style tabbed editing, multi-tab session restore, light/dark/system themes, word wrap, zoom, and an update check (**Help → Check for Updates**) against the latest GitHub release — the packaged WinUI build offers the `.msix` via App Installer, while the Avalonia build opens the release page to download.
+Both frontends share the same feature set: Notepad++-style tabbed editing, multi-tab session restore, light/dark/system themes, word wrap, zoom, and in-app updates (**Help → Check for Updates**) served from the GitHub Releases: the packaged WinUI build offers the `.msix` via App Installer, while the Avalonia build installs and self-updates across Windows/macOS/Linux with [Velopack](https://velopack.io) (download, apply, and relaunch from within the app).
 
 ## Building
 
@@ -37,6 +37,20 @@ Core library and the cross-platform Avalonia version (Windows/macOS/Linux):
 dotnet build SimpleText.Core/SimpleText.Core.csproj
 dotnet run   --project SimpleText.Avalonia/SimpleText.Avalonia.csproj
 ```
+
+#### Avalonia installers (Velopack)
+
+Released builds are packaged with [Velopack](https://velopack.io) into per-OS installers
+(Windows `Setup.exe`, macOS `.app`, Linux `.AppImage`) plus an update feed, so the installed
+app can update itself in place. CI does this on tag `v*` — see the `pack-avalonia` job in
+[`.github/workflows/release.yml`](.github/workflows/release.yml). To build one locally:
+```
+dotnet tool install -g vpk                          # Velopack CLI (Linux also needs squashfs-tools)
+dotnet publish SimpleText.Avalonia/SimpleText.Avalonia.csproj -c Release -r linux-x64 --self-contained -o publish
+vpk pack -u SimpleText.Avalonia -v 1.0.0 -p publish -e SimpleText.Avalonia -o vpk-release
+```
+Installers are unsigned (matching the WinUI self-signed MSIX), so macOS Gatekeeper and Windows
+SmartScreen will warn until the package is trusted.
 
 ### WinUI 3 (packaged MSIX, Windows only)
 

@@ -12,7 +12,6 @@ using SimpleText.Core.Elements;
 using SimpleText.Core.FileTypes;
 using SimpleText.Core.Session;
 using SimpleText.Core.Templates;
-using SimpleText.Core.Updates;
 
 namespace SimpleText.Avalonia.Views;
 
@@ -1076,19 +1075,19 @@ public partial class MainWindow : Window
         await tcs.Task;
     }
 
-    private void ShowInfoBanner(string message, string? actionText = null, string? actionUrl = null)
+    private void ShowInfoBanner(string message, string? actionText = null, Func<Task>? action = null)
     {
         InfoBannerText.Text = message;
 
-        if (!string.IsNullOrEmpty(actionText) && !string.IsNullOrEmpty(actionUrl))
+        if (!string.IsNullOrEmpty(actionText) && action != null)
         {
-            _bannerActionUrl = actionUrl;
+            _bannerAction = action;
             InfoBannerAction.Content = actionText;
             InfoBannerAction.IsVisible = true;
         }
         else
         {
-            _bannerActionUrl = null;
+            _bannerAction = null;
             InfoBannerAction.IsVisible = false;
         }
 
@@ -1097,38 +1096,48 @@ public partial class MainWindow : Window
 
     // --- Updates ---
 
-    private string? _bannerActionUrl;
+    private Func<Task>? _bannerAction;
 
     /// <summary>
-    /// Checks GitHub for a newer release. A found update shows a banner with a Download button
-    /// that opens the release page; the check fails silently on network errors. When
-    /// <paramref name="userInitiated"/> is true (Help &gt; Check for Updates) the "you're up to
-    /// date" outcome is also reported so the menu action always gives feedback.
+    /// Checks GitHub for a newer release via Velopack. A found update shows a banner whose
+    /// button downloads and applies it in place and restarts the app. The check fails silently
+    /// on network errors and is a no-op for non-installed builds. When <paramref name="userInitiated"/>
+    /// is true (Help &gt; Check for Updates) the "you're up to date" outcome is also reported so
+    /// the menu action always gives feedback.
     /// </summary>
     private async Task CheckForUpdatesAsync(bool userInitiated)
     {
         var update = await UpdateService.CheckForUpdatesAsync();
 
-        if (update.IsUpdateAvailable)
+        if (update != null)
             ShowInfoBanner(
-                $"A new version ({update.Version}) is available.",
-                actionText: "Download",
-                actionUrl: update.DownloadUrl);
+                $"A new version ({update.TargetFullRelease.Version}) is available.",
+                actionText: "Restart & Update",
+                action: () => ApplyUpdateAsync(update));
         else if (userInitiated)
             ShowInfoBanner("You are on the latest version.");
     }
 
+    private async Task ApplyUpdateAsync(global::Velopack.UpdateInfo update)
+    {
+        // DownloadAndApply restarts the app on success and never returns; swap the action for a
+        // progress message so the button can't be clicked twice mid-update.
+        ShowInfoBanner("Downloading update… the app will restart when it's ready.");
+        await UpdateService.DownloadAndApplyAsync(update);
+    }
+
     private async void OnInfoBannerActionClick(object? sender, global::Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (string.IsNullOrEmpty(_bannerActionUrl))
+        var action = _bannerAction;
+        if (action == null)
             return;
         try
         {
-            await Launcher.LaunchUriAsync(new Uri(_bannerActionUrl));
+            await action();
         }
         catch (Exception ex)
         {
-            ShowInfoBanner($"Could not open the download page: {ex.Message}");
+            ShowInfoBanner($"Update failed: {ex.Message}");
         }
     }
 

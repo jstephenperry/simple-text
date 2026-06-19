@@ -7,8 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>SimpleText.Avalonia</RootNamespace>
     <AssemblyName>SimpleText.Avalonia</AssemblyName>
-    <!-- Gates the Help > Check for Updates comparison against the latest GitHub release.
-         Keep in step with the WinUI Package.appxmanifest version when cutting a release. -->
+    <!-- Local/dev assembly version. Release builds stamp the real version from the git tag
+         (-p:Version) and Velopack packs that same version, which drives auto-update. -->
     <Version>1.0.0.7</Version>
   </PropertyGroup>
 
@@ -20,6 +20,8 @@
     <PackageReference Include="Avalonia.AvaloniaEdit" Version="11.4.1" />
     <PackageReference Include="AvaloniaEdit.TextMate" Version="11.4.1" />
     <PackageReference Include="TextMateSharp.Grammars" Version="2.0.4" />
+    <!-- Cross-platform install + in-app auto-update (served from GitHub Releases). -->
+    <PackageReference Include="Velopack" Version="1.2.0" />
   </ItemGroup>
 
   <!-- Security override: pin the patched Tmds.DBus.Protocol. Avalonia.FreeDesktop
