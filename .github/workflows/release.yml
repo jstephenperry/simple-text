@@ -158,17 +158,14 @@ jobs:
           dotnet tool install -g vpk --version 1.2.0
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
-      # Tags carry MSIX's required 4th component (v1.0.1.0); Velopack uses 3-part SemVer, so the
-      # SemVer is the first three parts and the MSIX build field is dropped (1.0.1.0 -> 1.0.1).
-      # Bump the patch (3rd component) for each Avalonia release so versions strictly increase.
-      - name: Derive Velopack version from tag
+      # version.txt (3-part SemVer) is the single source of truth; Velopack uses it directly.
+      # The git tag is just the release trigger (the MSIX manifest carries the 4-part version.txt + ".0").
+      - name: Read version
         shell: bash
         run: |
-          raw="${GITHUB_REF_NAME#v}"
-          IFS='.' read -r p1 p2 p3 _ <<< "$raw"
-          ver="${p1:-0}.${p2:-0}.${p3:-0}"
+          ver="$(tr -d '[:space:]' < version.txt)"
           echo "VPK_VERSION=$ver" >> "$GITHUB_ENV"
-          echo "Packing Velopack version $ver (from tag $GITHUB_REF_NAME)"
+          echo "Packing Velopack version $ver (from version.txt; tag $GITHUB_REF_NAME)"
 
       - name: Publish (self-contained)
         shell: bash

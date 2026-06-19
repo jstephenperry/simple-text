@@ -23,7 +23,7 @@ highlighting and Find).
 ## Two UIs, one core
 
 - **SimpleText.WinUI** — Windows-native [WinUI 3](https://learn.microsoft.com/windows/apps/winui/winui3/) (Windows App SDK)
-- **SimpleText.Avalonia** — Cross-platform (Windows/macOS/Linux), built on [Avalonia UI](https://avaloniaui.net/) with [AvaloniaEdit](https://github.com/AvaloniaUI/AvaloniaEdit) and TextMate grammars
+- **SimpleText.Avalonia** — Cross-platform (Windows/macOS/Linux), built on [Avalonia UI](https://avaloniaui.net/) with [AvaloniaEdit](https://github.com/AvaloniaUI/AvaloniaEdit) and TextMate grammars. The editor renders in the bundled monospace [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (OFL) so source tables line up identically on every OS, regardless of installed fonts
 - **SimpleText.Core** — Shared library (session management, file types, search, templates, and the semantic highlighting engine: Markdig + TextMate span parsers behind a UI-agnostic `ISpanHighlighter`)
 
 Both frontends share the same feature set: Notepad++-style tabbed editing, multi-tab session restore, light/dark/system themes, word wrap, zoom, and a consistent in-app updater (**Help → Check for Updates**). Both implement one shared `IUpdateService` contract (in `SimpleText.Core`) with an identical check → notify → apply flow: check GitHub Releases, then stage the update silently so it applies on the next launch. The WinUI build updates the MSIX in place (`PackageManager`, falling back to App Installer); the Avalonia build uses [Velopack](https://velopack.io) across Windows/macOS/Linux.
@@ -92,6 +92,24 @@ CI/CD builds this for you: see [`.github/workflows/ci.yml`](.github/workflows/ci
 (PR/branch build checks) and [`.github/workflows/release.yml`](.github/workflows/release.yml)
 (tag `v*` → signed packages on a GitHub Release). Packaging and storage details
 are in [`docs/msix-packaging.md`](docs/msix-packaging.md).
+
+### Versioning
+
+There is one source of truth for the version: **`version.txt`** at the repo root (3-part
+SemVer, e.g. `1.0.1`). Every .NET project reads it via [`Directory.Build.props`](Directory.Build.props),
+and the Avalonia/Velopack release packs from it. Windows requires a 4-part package version, so
+the WinUI MSIX manifest carries `version.txt + ".0"` (e.g. `1.0.1.0`).
+
+Bump the version with the helper, which increments `version.txt` **and** syncs the manifest:
+
+```
+build/bump-version.sh            # patch: 1.0.1 -> 1.0.2
+build/bump-version.sh minor      # 1.0.2 -> 1.1.0
+build/bump-version.sh set 2.0.0  # explicit
+```
+
+CI (`version-check`) fails if the manifest ever drifts from `version.txt`. To cut a release,
+bump, commit, then tag `v<version>.0` (e.g. `v1.0.2.0`) and push the tag.
 
 ## Disclaimer
 
