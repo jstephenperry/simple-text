@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   # Fast, cross-platform sanity check of the shared core (where most logic lives) plus its
-  # unit tests. The Avalonia frontend is intentionally excluded from CI.
+  # unit tests.
   core:
     name: Build & test core
     runs-on: ubuntu-latest
@@ -26,6 +26,19 @@ jobs:
           global-json-file: global.json
       - run: dotnet build SimpleText.Core/SimpleText.Core.csproj -c Release
       - run: dotnet test SimpleText.Core.Tests/SimpleText.Core.Tests.csproj -c Release
+
+  # Compile-check the cross-platform Avalonia frontend. It targets net10.0 and builds
+  # headlessly on Linux (no display, MSIX, or Windows tooling needed), so a plain build
+  # is enough to catch breakage in the frontend and its shared-core usage.
+  avalonia:
+    name: Build Avalonia
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet build SimpleText.Avalonia/SimpleText.Avalonia.csproj -c Release
 
   # Render the MSIX visual assets from the brand SVG (reliable tooling on Linux).
   assets:
