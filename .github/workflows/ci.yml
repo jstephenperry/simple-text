@@ -32,17 +32,20 @@ jobs:
           fi
 
   # Fast, cross-platform sanity check of the shared core (where most logic lives) plus its
-  # unit tests.
+  # unit tests. BuildNumber (the auto-incrementing 4th version component) is the workflow run
+  # number, so the built assemblies carry a unique, increasing build version.
   core:
     name: Build & test core
     runs-on: ubuntu-latest
+    env:
+      BuildNumber: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-      - run: dotnet build SimpleText.Core/SimpleText.Core.csproj -c Release
-      - run: dotnet test SimpleText.Core.Tests/SimpleText.Core.Tests.csproj -c Release
+      - run: dotnet build SimpleText.Core/SimpleText.Core.csproj -c Release -p:BuildNumber=$BuildNumber
+      - run: dotnet test SimpleText.Core.Tests/SimpleText.Core.Tests.csproj -c Release -p:BuildNumber=$BuildNumber
 
   # Compile-check the cross-platform Avalonia frontend. It targets net10.0 and builds
   # headlessly on Linux (no display, MSIX, or Windows tooling needed), so a plain build
@@ -50,12 +53,14 @@ jobs:
   avalonia:
     name: Build Avalonia
     runs-on: ubuntu-latest
+    env:
+      BuildNumber: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-      - run: dotnet build SimpleText.Avalonia/SimpleText.Avalonia.csproj -c Release
+      - run: dotnet build SimpleText.Avalonia/SimpleText.Avalonia.csproj -c Release -p:BuildNumber=$BuildNumber
 
   # Render the MSIX visual assets from the brand SVG (reliable tooling on Linux).
   assets:
@@ -84,6 +89,7 @@ jobs:
     env:
       Project: SimpleText.WinUI/SimpleText.WinUI.csproj
       PackageDir: ${{ github.workspace }}\AppPackages
+      BuildNumber: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
 
@@ -94,6 +100,12 @@ jobs:
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
+
+      # Stamp the auto-incrementing build number into the MSIX manifest's 4-part Identity version
+      # (version.txt + "." + run number) so each packaged build is uniquely and increasingly versioned.
+      - name: Stamp build version
+        shell: bash
+        run: ./build/set-build-version.sh "$BuildNumber"
 
       - name: Download generated assets
         uses: actions/download-artifact@v4
@@ -110,6 +122,7 @@ jobs:
           msbuild "${{ env.Project }}" `
             /p:Configuration=Release `
             /p:Platform=${{ matrix.platform }} `
+            /p:BuildNumber=${{ env.BuildNumber }} `
             /p:GenerateAppxPackageOnBuild=true `
             /p:AppxPackageDir="${{ env.PackageDir }}\" `
             /p:UapAppxPackageBuildMode=SideloadOnly `

@@ -1,15 +1,19 @@
 name: Release MSIX
 
+# Releases are cut by running this workflow (Actions tab -> Run workflow, on the commit/branch to
+# release), NOT by pushing a hand-made tag: the released version is version.txt + an auto-incrementing
+# build number (the workflow run number), which isn't known until the run starts. The workflow stamps
+# that full 4-part version into the MSIX manifest and the Velopack package, then publishes the GitHub
+# Release tagged with it. App-reported version == git tag == MSIX Identity == Velopack package, so both
+# in-app updaters (WinUI tag comparison; Avalonia/Velopack package comparison) detect updates correctly.
 on:
-  push:
-    tags: ['v*']        # e.g. v1.0.0
   workflow_dispatch:
 
 permissions:
-  contents: write       # create the GitHub Release and upload assets
+  contents: write       # create the release tag, the GitHub Release, and upload assets
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release        # serialize releases so build-number-derived versions stay strictly increasing
   cancel-in-progress: false
 
 jobs:
@@ -34,6 +38,7 @@ jobs:
     env:
       Project: SimpleText.WinUI/SimpleText.WinUI.csproj
       PackageDir: ${{ github.workspace }}\AppPackages
+      BuildNumber: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
 
@@ -44,6 +49,18 @@ jobs:
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
+
+      # The full release version is version.txt + the auto-incrementing build number, and the release
+      # tag mirrors it (vX.Y.Z.<build>). Stamp it into the MSIX manifest's 4-part Identity so the
+      # packaged version, the git tag, and the app's reported version all agree (drives WinUI updates).
+      - name: Compute & stamp build version
+        shell: bash
+        run: |
+          ver="$(tr -d '[:space:]' < version.txt)"
+          full="${ver}.${BuildNumber}"
+          echo "FULL_VERSION=$full" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=v$full" >> "$GITHUB_ENV"
+          ./build/set-build-version.sh "$BuildNumber"
 
       - name: Download generated assets
         uses: actions/download-artifact@v4
@@ -91,6 +108,7 @@ jobs:
             msbuild "${{ env.Project }}" `
               /p:Configuration=Release `
               /p:Platform=$p `
+              /p:BuildNumber=${{ env.BuildNumber }} `
               /p:GenerateAppxPackageOnBuild=true `
               /p:AppxPackageDir="${{ env.PackageDir }}\" `
               /p:UapAppxPackageBuildMode=SideloadOnly `
@@ -109,10 +127,15 @@ jobs:
             ForEach-Object { Copy-Item $_.FullName -Destination $dest }
           Get-ChildItem $dest
 
+      # Create the release tag (vX.Y.Z.<build>) at the current commit and publish the Release with the
+      # MSIX assets. action-gh-release creates the tag if it doesn't exist; pack-avalonia then appends
+      # its installers to this same tag's release.
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
           files: ${{ runner.temp }}/release/*
           generate_release_notes: true
           fail_on_unmatched_files: true
@@ -120,11 +143,12 @@ jobs:
   # Cross-platform Avalonia installers + in-app auto-update feed, built with Velopack and
   # attached to the same GitHub Release. Each OS packs its own channel (win/osx/linux) that
   # the app's UpdateManager reads; the release object is created first by the MSIX `build`
-  # job (so notes exist), and these jobs append their assets. Tags only.
+  # job (so notes exist), and these jobs append their assets.
   pack-avalonia:
     name: Pack Avalonia (${{ matrix.rid }})
     needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+    env:
+      BuildNumber: ${{ github.run_number }}
     strategy:
       fail-fast: false
       matrix:
@@ -158,21 +182,25 @@ jobs:
           dotnet tool install -g vpk --version 1.2.0
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
-      # version.txt (3-part SemVer) is the single source of truth; Velopack uses it directly.
-      # The git tag is just the release trigger (the MSIX manifest carries the 4-part version.txt + ".0").
+      # Pack the same full version the MSIX build/tag use: version.txt + the auto-incrementing build
+      # number. Velopack compares package versions from the feed to decide updates, so this 4th
+      # component makes every release strictly newer than the last (even without a version.txt bump),
+      # which is exactly what the Avalonia in-app updater needs.
       - name: Read version
         shell: bash
         run: |
           ver="$(tr -d '[:space:]' < version.txt)"
-          echo "VPK_VERSION=$ver" >> "$GITHUB_ENV"
-          echo "Packing Velopack version $ver (from version.txt; tag $GITHUB_REF_NAME)"
+          full="${ver}.${BuildNumber}"
+          echo "VPK_VERSION=$full" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=v$full" >> "$GITHUB_ENV"
+          echo "Packing Velopack version $full (version.txt $ver + build $BuildNumber)"
 
       - name: Publish (self-contained)
         shell: bash
         run: >
           dotnet publish SimpleText.Avalonia/SimpleText.Avalonia.csproj
           -c Release -r ${{ matrix.rid }} --self-contained true
-          -p:Version=$VPK_VERSION -o publish
+          -p:Version=$VPK_VERSION -p:BuildNumber=$BuildNumber -o publish
 
       - name: Pack with Velopack
         shell: bash
@@ -191,5 +219,6 @@ jobs:
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
           files: vpk-release/*
           fail_on_unmatched_files: true
