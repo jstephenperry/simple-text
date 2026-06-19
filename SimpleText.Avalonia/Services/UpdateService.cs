@@ -1,49 +1,59 @@
+using System.Threading;
 using System.Threading.Tasks;
+using SimpleText.Core.Updates;
 using Velopack;
 using Velopack.Sources;
 
 namespace SimpleText.Avalonia.Services;
 
 /// <summary>
-/// Avalonia auto-update via Velopack. Updates are served from the project's GitHub Releases
-/// (Velopack picks the channel for the running OS), and an installed build can download and
-/// apply an update in place, then relaunch. Running unpackaged (e.g. <c>dotnet run</c>, or a
-/// loose publish) is a no-op so development and one-off builds are never disrupted.
+/// Velopack implementation of <see cref="IUpdateService"/>. Checks the project's GitHub Releases
+/// (Velopack picks the channel for the running OS) and stages a found update so it applies when
+/// the app next exits — matching the WinUI deferred model, so both frontends behave the same.
+/// A no-op for non-installed/dev builds; never throws.
 /// </summary>
-internal static class UpdateService
+internal sealed class UpdateService : IUpdateService
 {
     private const string RepoUrl = "https://github.com/jstephenperry/simple-text";
 
-    private static UpdateManager CreateManager()
-        => new(new GithubSource(RepoUrl, accessToken: null, prerelease: false));
+    private UpdateManager? _manager;
+    private global::Velopack.UpdateInfo? _pending;
 
-    /// <summary>
-    /// Returns the available update, or <see langword="null"/> when up to date, when not running
-    /// as a Velopack install, or when the check fails (network/parse). Never throws.
-    /// </summary>
-    public static async Task<UpdateInfo?> CheckForUpdatesAsync()
+    public async Task<UpdateStatus> CheckForUpdatesAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            var manager = CreateManager();
-            if (!manager.IsInstalled)
-                return null;
-            return await manager.CheckForUpdatesAsync();
+            _manager = new UpdateManager(new GithubSource(RepoUrl, accessToken: null, prerelease: false));
+            if (!_manager.IsInstalled)
+                return UpdateStatus.None;
+
+            _pending = await _manager.CheckForUpdatesAsync();
+            return _pending != null
+                ? new UpdateStatus(true, _pending.TargetFullRelease.Version.ToString())
+                : UpdateStatus.None;
         }
         catch
         {
-            return null;
+            return UpdateStatus.None;
         }
     }
 
-    /// <summary>
-    /// Downloads the update, applies it, and restarts the app. Does not return on success
-    /// (the process is replaced); throws if the download fails.
-    /// </summary>
-    public static async Task DownloadAndApplyAsync(UpdateInfo update)
+    public async Task<UpdateOutcome> ApplyPendingUpdateAsync(CancellationToken cancellationToken = default)
     {
-        var manager = CreateManager();
-        await manager.DownloadUpdatesAsync(update);
-        manager.ApplyUpdatesAndRestart(update);
+        if (_manager == null || _pending == null)
+            return UpdateOutcome.NoUpdatePending;
+
+        try
+        {
+            await _manager.DownloadUpdatesAsync(_pending);
+            // Apply when the app next exits (no forced restart), mirroring WinUI's deferred
+            // registration: the next launch runs the new version.
+            _manager.WaitExitThenApplyUpdates(_pending, silent: true, restart: false);
+            return UpdateOutcome.ReadyOnNextLaunch;
+        }
+        catch
+        {
+            return UpdateOutcome.Failed;
+        }
     }
 }

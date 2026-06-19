@@ -26,7 +26,7 @@ highlighting and Find).
 - **SimpleText.Avalonia** — Cross-platform (Windows/macOS/Linux), built on [Avalonia UI](https://avaloniaui.net/) with [AvaloniaEdit](https://github.com/AvaloniaUI/AvaloniaEdit) and TextMate grammars
 - **SimpleText.Core** — Shared library (session management, file types, search, templates, and the semantic highlighting engine: Markdig + TextMate span parsers behind a UI-agnostic `ISpanHighlighter`)
 
-Both frontends share the same feature set: Notepad++-style tabbed editing, multi-tab session restore, light/dark/system themes, word wrap, zoom, and in-app updates (**Help → Check for Updates**) served from the GitHub Releases: the packaged WinUI build offers the `.msix` via App Installer, while the Avalonia build installs and self-updates across Windows/macOS/Linux with [Velopack](https://velopack.io) (download, apply, and relaunch from within the app).
+Both frontends share the same feature set: Notepad++-style tabbed editing, multi-tab session restore, light/dark/system themes, word wrap, zoom, and a consistent in-app updater (**Help → Check for Updates**). Both implement one shared `IUpdateService` contract (in `SimpleText.Core`) with an identical check → notify → apply flow: check GitHub Releases, then stage the update silently so it applies on the next launch. The WinUI build updates the MSIX in place (`PackageManager`, falling back to App Installer); the Avalonia build uses [Velopack](https://velopack.io) across Windows/macOS/Linux.
 
 ## Building
 

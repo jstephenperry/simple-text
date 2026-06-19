@@ -87,7 +87,7 @@ public class UpdateCheckerTests
 
         var info = UpdateChecker.ParseLatestRelease(json, new Version(1, 0, 0, 0), PickMsix);
 
-        Assert.Equal("ms-appinstaller:?source=https://example.com/x64.msix", info.DownloadUrl);
+        Assert.Equal("https://example.com/x64.msix", info.DownloadUrl);
     }
 
     [Fact]
@@ -110,12 +110,14 @@ public class UpdateCheckerTests
         Assert.Equal("https://example.com/b.zip", seen[1].DownloadUrl);
     }
 
-    // Mirrors the WinUI asset selector: prefer the .msix, wrapped for App Installer.
+    // Mirrors the WinUI asset selector: pick the architecture-matching .msix's direct URL
+    // (App Installer applies the update from the downloaded file).
     private static string? PickMsix(IReadOnlyList<ReleaseAsset> assets)
     {
         foreach (var asset in assets)
-            if (asset.Name.EndsWith(".msix", StringComparison.OrdinalIgnoreCase))
-                return $"ms-appinstaller:?source={asset.DownloadUrl}";
+            if (asset.Name.EndsWith(".msix", StringComparison.OrdinalIgnoreCase)
+                && asset.Name.Contains("x64", StringComparison.OrdinalIgnoreCase))
+                return asset.DownloadUrl;
         return null;
     }
 
