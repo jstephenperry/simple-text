@@ -1141,22 +1141,38 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void OnSessionInfoBarActionClick(object sender, RoutedEventArgs e)
+    private async void OnSessionInfoBarActionClick(object sender, RoutedEventArgs e)
     {
-        if (!string.IsNullOrEmpty(_currentActionUrl))
+        var url = _currentActionUrl;
+        if (string.IsNullOrEmpty(url))
+            return;
+
+        try
         {
-            try
+            var isMsixDownload = url.EndsWith(".msix", StringComparison.OrdinalIgnoreCase)
+                && (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                    || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
+
+            if (isMsixDownload)
+            {
+                // ms-appinstaller: is disabled by default on current Windows, so download the
+                // package and let App Installer apply the update from the local file.
+                ShowInfoBar("Downloading update…", InfoBarSeverity.Informational);
+                await UpdateService.DownloadAndLaunchAsync(url);
+                ShowInfoBar("Follow the App Installer prompt to finish updating.", InfoBarSeverity.Success, autoHideSeconds: 10);
+            }
+            else
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
-                    FileName = _currentActionUrl,
+                    FileName = url,
                     UseShellExecute = true
                 });
             }
-            catch (Exception ex)
-            {
-                ShowInfoBar($"Failed to launch update: {ex.Message}", InfoBarSeverity.Error, autoHideSeconds: 10);
-            }
+        }
+        catch (Exception ex)
+        {
+            ShowInfoBar($"Failed to download update: {ex.Message}", InfoBarSeverity.Error, autoHideSeconds: 10);
         }
     }
 
