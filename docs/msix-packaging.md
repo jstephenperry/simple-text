@@ -100,7 +100,7 @@ Or, when installing a **downloaded GitHub Release** (you have `*.msix` +
 
 ```powershell
 pwsh build/trust-cert.ps1 -Path .\SimpleText.cer     # one-time, elevates itself
-Add-AppxPackage .\SimpleText.Editor_1.0.0.0_x64.msix
+Add-AppxPackage .\SimpleText.Editor_1.0.1.0_x64.msix
 ```
 
 `trust-cert.ps1` also accepts the `.msix` directly and extracts the signer cert

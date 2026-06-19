@@ -47,7 +47,7 @@ app can update itself in place. CI does this on tag `v*` — see the `pack-avalo
 ```
 dotnet tool install -g vpk                          # Velopack CLI (Linux also needs squashfs-tools)
 dotnet publish SimpleText.Avalonia/SimpleText.Avalonia.csproj -c Release -r linux-x64 --self-contained -o publish
-vpk pack -u SimpleText.Avalonia -v 1.0.0 -p publish -e SimpleText.Avalonia -o vpk-release
+vpk pack -u SimpleText.Avalonia -v 1.0.1 -p publish -e SimpleText.Avalonia -o vpk-release
 ```
 Installers are unsigned (matching the WinUI self-signed MSIX), so macOS Gatekeeper and Windows
 SmartScreen will warn until the package is trusted.
@@ -80,7 +80,7 @@ Installing a downloaded [Release](../../releases) instead? Trust its certificate
 
 ```powershell
 pwsh build/trust-cert.ps1 -Path .\SimpleText.cer
-Add-AppxPackage .\SimpleText.Editor_1.0.0.0_x64.msix
+Add-AppxPackage .\SimpleText.Editor_1.0.1.0_x64.msix
 ```
 
 The cert is reused across builds, so you only trust it once. For zero per-machine

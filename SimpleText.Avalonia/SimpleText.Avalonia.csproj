@@ -7,9 +7,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>SimpleText.Avalonia</RootNamespace>
     <AssemblyName>SimpleText.Avalonia</AssemblyName>
-    <!-- Local/dev assembly version. Release builds stamp the real version from the git tag
-         (-p:Version) and Velopack packs that same version, which drives auto-update. -->
-    <Version>1.0.0.7</Version>
+    <!-- Local/dev assembly version (3-part SemVer; the WinUI MSIX carries the 4-part 1.0.1.0).
+         Release builds stamp the real version from the git tag (-p:Version) and Velopack packs
+         that same version, which drives auto-update. -->
+    <Version>1.0.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
