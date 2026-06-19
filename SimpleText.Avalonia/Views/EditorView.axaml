@@ -3,7 +3,7 @@
              xmlns:ae="clr-namespace:AvaloniaEdit;assembly=AvaloniaEdit"
              x:Class="SimpleText.Avalonia.Views.EditorView">
   <ae:TextEditor x:Name="Editor"
-                 FontFamily="Cascadia Mono, JetBrains Mono, Consolas, monospace"
+                 FontFamily="avares://SimpleText.Avalonia/Assets/Fonts/JetBrainsMono-Regular.ttf#JetBrains Mono"
                  FontSize="14"
                  ShowLineNumbers="True"
                  WordWrap="False"
