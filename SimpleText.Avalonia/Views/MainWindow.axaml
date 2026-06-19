@@ -47,6 +47,8 @@
         <MenuItem x:Name="UserManualMenuItem" Header="_User Manual" />
         <Separator />
         <MenuItem x:Name="OpenTemplatesFolderMenuItem" Header="Open _Templates Folder" />
+        <Separator />
+        <MenuItem x:Name="CheckForUpdatesMenuItem" Header="Check for _Updates..." />
       </MenuItem>
     </Menu>
 
@@ -55,12 +57,16 @@
             Padding="10,6"
             Background="#FFF4E5"
             BorderBrush="#E0B070" BorderThickness="0,0,0,1">
-      <Grid ColumnDefinitions="*,Auto">
+      <Grid ColumnDefinitions="*,Auto,Auto">
         <TextBlock x:Name="InfoBannerText" Grid.Column="0"
                    Foreground="#7A5200"
                    VerticalAlignment="Center"
                    TextWrapping="Wrap" />
-        <Button x:Name="InfoBannerClose" Grid.Column="1" Content="✕"
+        <Button x:Name="InfoBannerAction" Grid.Column="1" Content="Download"
+                IsVisible="False"
+                Margin="8,0,4,0"
+                VerticalAlignment="Center" />
+        <Button x:Name="InfoBannerClose" Grid.Column="2" Content="✕"
                 Width="24" Height="24" Padding="0"
                 Background="Transparent" BorderThickness="0"
                 Foreground="#7A5200"

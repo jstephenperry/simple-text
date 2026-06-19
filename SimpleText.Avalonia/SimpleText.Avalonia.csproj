@@ -7,6 +7,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>SimpleText.Avalonia</RootNamespace>
     <AssemblyName>SimpleText.Avalonia</AssemblyName>
+    <!-- Gates the Help > Check for Updates comparison against the latest GitHub release.
+         Keep in step with the WinUI Package.appxmanifest version when cutting a release. -->
+    <Version>1.0.0.7</Version>
   </PropertyGroup>
 
   <ItemGroup>

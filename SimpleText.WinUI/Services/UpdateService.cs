@@ -1,77 +1,49 @@
 using System;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text.Json;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using SimpleText.Core.Updates;
 using Windows.ApplicationModel;
 
 namespace SimpleText.WinUI.Services;
 
+/// <summary>
+/// WinUI-specific update check. Reads the running version from the MSIX package and delegates
+/// the GitHub query + version comparison to <see cref="UpdateChecker"/>, selecting the .msix
+/// asset so Windows App Installer can perform the in-place update.
+/// </summary>
 public static class UpdateService
 {
-    private const string GitHubApiUrl = "https://api.github.com/repos/jstephenperry/simple-text/releases/latest";
-
-    public record UpdateInfo(bool IsUpdateAvailable, string Version, string DownloadUrl, string ReleaseNotesUrl);
-
     public static async Task<UpdateInfo> CheckForUpdatesAsync()
     {
+        Version currentVersion;
         try
         {
-            Version currentVersion;
-            try
-            {
-                var packageVersion = Package.Current.Id.Version;
-                currentVersion = new Version(packageVersion.Major, packageVersion.Minor, packageVersion.Build, packageVersion.Revision);
-            }
-            catch
-            {
-                // Not running as an MSIX package, maybe running from VS
-                return new UpdateInfo(false, "", "", "");
-            }
-
-            using var client = new HttpClient();
-            client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SimpleText", currentVersion.ToString()));
-            
-            var response = await client.GetStringAsync(GitHubApiUrl);
-            var doc = JsonDocument.Parse(response);
-            var root = doc.RootElement;
-            
-            var tagName = root.GetProperty("tag_name").GetString() ?? "";
-            var htmlUrl = root.GetProperty("html_url").GetString() ?? "";
-            
-            var cleanTag = tagName.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? tagName.Substring(1) : tagName;
-            
-            if (Version.TryParse(cleanTag, out var latestVersion))
-            {
-                if (latestVersion > currentVersion)
-                {
-                    string downloadUrl = htmlUrl;
-                    if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var asset in assets.EnumerateArray())
-                        {
-                            var name = asset.GetProperty("name").GetString();
-                            if (name != null && name.EndsWith(".msix", StringComparison.OrdinalIgnoreCase))
-                            {
-                                downloadUrl = asset.GetProperty("browser_download_url").GetString() ?? htmlUrl;
-                                if (downloadUrl.EndsWith(".msix", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    downloadUrl = $"ms-appinstaller:?source={downloadUrl}";
-                                }
-                                break;
-                            }
-                        }
-                    }
-                    
-                    return new UpdateInfo(true, tagName, downloadUrl, htmlUrl);
-                }
-            }
+            var packageVersion = Package.Current.Id.Version;
+            currentVersion = new Version(packageVersion.Major, packageVersion.Minor, packageVersion.Build, packageVersion.Revision);
         }
         catch
         {
-            // Fail silently on network errors or parsing issues
+            // Not running as an MSIX package (e.g. launched unpackaged from VS): no update channel.
+            return UpdateInfo.None;
         }
-        
-        return new UpdateInfo(false, "", "", "");
+
+        return await UpdateChecker.CheckForUpdatesAsync(currentVersion, SelectMsixAsset);
+    }
+
+    // Prefer the .msix asset and hand it to App Installer via the ms-appinstaller protocol so
+    // Windows performs the in-place update; otherwise fall back to the release page.
+    private static string? SelectMsixAsset(IReadOnlyList<ReleaseAsset> assets)
+    {
+        foreach (var asset in assets)
+        {
+            if (asset.Name.EndsWith(".msix", StringComparison.OrdinalIgnoreCase))
+            {
+                var url = asset.DownloadUrl;
+                return url.EndsWith(".msix", StringComparison.OrdinalIgnoreCase)
+                    ? $"ms-appinstaller:?source={url}"
+                    : url;
+            }
+        }
+        return null;
     }
 }

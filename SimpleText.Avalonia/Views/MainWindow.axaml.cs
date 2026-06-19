@@ -12,6 +12,7 @@ using SimpleText.Core.Elements;
 using SimpleText.Core.FileTypes;
 using SimpleText.Core.Session;
 using SimpleText.Core.Templates;
+using SimpleText.Core.Updates;
 
 namespace SimpleText.Avalonia.Views;
 
@@ -204,6 +205,7 @@ public partial class MainWindow : Window
         TemplateCatalog.Shared.Changed += OnTemplatesChanged;
         OpenTemplatesFolderMenuItem.Click += async (_, _) => await OpenTemplatesFolderAsync();
         UserManualMenuItem.Click += async (_, _) => await OpenUserManualAsync();
+        CheckForUpdatesMenuItem.Click += async (_, _) => await CheckForUpdatesAsync(userInitiated: true);
         OpenMenuItem.Click += async (_, _) => await OpenFileDialogAsync();
         SaveMenuItem.Click += async (_, _) => await SaveActiveAsync();
         SaveAsMenuItem.Click += async (_, _) => await SaveActiveAsAsync();
@@ -236,6 +238,7 @@ public partial class MainWindow : Window
 
         // Info banner
         InfoBannerClose.Click += (_, _) => InfoBanner.IsVisible = false;
+        InfoBannerAction.Click += OnInfoBannerActionClick;
 
         // Find bar
         FindNextButton.Click += (_, _) => FindNext();
@@ -285,6 +288,9 @@ public partial class MainWindow : Window
 
         UpdateAllActiveUi();
         ActivePane?.FocusEditor();
+
+        // Quietly check for a newer release on startup; only surfaces a banner if one exists.
+        _ = CheckForUpdatesAsync(userInitiated: false);
     }
 
     // --- Startup hooks (called by App before the window is shown) ---
@@ -1070,10 +1076,60 @@ public partial class MainWindow : Window
         await tcs.Task;
     }
 
-    private void ShowInfoBanner(string message)
+    private void ShowInfoBanner(string message, string? actionText = null, string? actionUrl = null)
     {
         InfoBannerText.Text = message;
+
+        if (!string.IsNullOrEmpty(actionText) && !string.IsNullOrEmpty(actionUrl))
+        {
+            _bannerActionUrl = actionUrl;
+            InfoBannerAction.Content = actionText;
+            InfoBannerAction.IsVisible = true;
+        }
+        else
+        {
+            _bannerActionUrl = null;
+            InfoBannerAction.IsVisible = false;
+        }
+
         InfoBanner.IsVisible = true;
+    }
+
+    // --- Updates ---
+
+    private string? _bannerActionUrl;
+
+    /// <summary>
+    /// Checks GitHub for a newer release. A found update shows a banner with a Download button
+    /// that opens the release page; the check fails silently on network errors. When
+    /// <paramref name="userInitiated"/> is true (Help &gt; Check for Updates) the "you're up to
+    /// date" outcome is also reported so the menu action always gives feedback.
+    /// </summary>
+    private async Task CheckForUpdatesAsync(bool userInitiated)
+    {
+        var update = await UpdateService.CheckForUpdatesAsync();
+
+        if (update.IsUpdateAvailable)
+            ShowInfoBanner(
+                $"A new version ({update.Version}) is available.",
+                actionText: "Download",
+                actionUrl: update.DownloadUrl);
+        else if (userInitiated)
+            ShowInfoBanner("You are on the latest version.");
+    }
+
+    private async void OnInfoBannerActionClick(object? sender, global::Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_bannerActionUrl))
+            return;
+        try
+        {
+            await Launcher.LaunchUriAsync(new Uri(_bannerActionUrl));
+        }
+        catch (Exception ex)
+        {
+            ShowInfoBanner($"Could not open the download page: {ex.Message}");
+        }
     }
 
     // --- Helpers ---
