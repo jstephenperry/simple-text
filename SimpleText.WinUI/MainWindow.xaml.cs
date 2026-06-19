@@ -7,6 +7,7 @@ using SimpleText.Core.Elements;
 using SimpleText.Core.FileTypes;
 using SimpleText.Core.Session;
 using SimpleText.Core.Templates;
+using SimpleText.Core.Updates;
 using SimpleText.WinUI.Controls;
 using SimpleText.WinUI.Services;
 using Windows.ApplicationModel.DataTransfer;
@@ -601,18 +602,11 @@ public sealed partial class MainWindow : Window
 
     private async void OnCheckForUpdatesClick(object sender, RoutedEventArgs e)
     {
-        var update = await UpdateService.CheckForUpdatesAsync();
-        if (update.IsUpdateAvailable)
-        {
-            ShowInfoBar($"A new version ({update.Version}) is available!", 
-                InfoBarSeverity.Informational, 
-                "Update Now", 
-                update.DownloadUrl, 30);
-        }
+        var status = await _updateService.CheckForUpdatesAsync();
+        if (status.IsUpdateAvailable)
+            ShowUpdateBanner(status.Version);
         else
-        {
             ShowInfoBar("You are on the latest version.", InfoBarSeverity.Success, autoHideSeconds: 5);
-        }
     }
 
     // --- Insert menu ---
@@ -1109,25 +1103,23 @@ public sealed partial class MainWindow : Window
     private static extern bool SetForegroundWindow(IntPtr hWnd);
 
     private int _infoBarToken;
-    private string? _currentActionUrl;
+    private readonly IUpdateService _updateService = new UpdateService();
 
-    private async void ShowInfoBar(string message, InfoBarSeverity severity = InfoBarSeverity.Warning, string? actionText = null, string? actionUrl = null, int autoHideSeconds = 0)
+    private async void ShowInfoBar(string message, InfoBarSeverity severity = InfoBarSeverity.Warning, string? actionText = null, int autoHideSeconds = 0)
     {
         SessionInfoBar.Message = message;
         SessionInfoBar.Severity = severity;
-        
-        if (!string.IsNullOrEmpty(actionText) && !string.IsNullOrEmpty(actionUrl))
+
+        if (!string.IsNullOrEmpty(actionText))
         {
-            _currentActionUrl = actionUrl;
             SessionInfoBarAction.Content = actionText;
             SessionInfoBarAction.Visibility = Visibility.Visible;
         }
         else
         {
-            _currentActionUrl = null;
             SessionInfoBarAction.Visibility = Visibility.Collapsed;
         }
-        
+
         SessionInfoBar.IsOpen = true;
 
         if (autoHideSeconds > 0)
@@ -1141,39 +1133,27 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    // Shows the "update available" bar; its action button applies the staged update.
+    private void ShowUpdateBanner(string version) =>
+        ShowInfoBar($"A new version ({version}) is available.", InfoBarSeverity.Informational, "Update", autoHideSeconds: 30);
+
     private async void OnSessionInfoBarActionClick(object sender, RoutedEventArgs e)
+        => await ApplyUpdateAsync();
+
+    private async Task ApplyUpdateAsync()
     {
-        var url = _currentActionUrl;
-        if (string.IsNullOrEmpty(url))
-            return;
-
-        try
-        {
-            var isMsixDownload = url.EndsWith(".msix", StringComparison.OrdinalIgnoreCase)
-                && (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
-                    || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
-
-            if (isMsixDownload)
+        ShowInfoBar("Downloading update…", InfoBarSeverity.Informational);
+        var outcome = await _updateService.ApplyPendingUpdateAsync();
+        ShowInfoBar(
+            outcome switch
             {
-                // ms-appinstaller: is disabled by default on current Windows, so download the
-                // package and let App Installer apply the update from the local file.
-                ShowInfoBar("Downloading update…", InfoBarSeverity.Informational);
-                await UpdateService.DownloadAndLaunchAsync(url);
-                ShowInfoBar("Follow the App Installer prompt to finish updating.", InfoBarSeverity.Success, autoHideSeconds: 10);
-            }
-            else
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = url,
-                    UseShellExecute = true
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            ShowInfoBar($"Failed to download update: {ex.Message}", InfoBarSeverity.Error, autoHideSeconds: 10);
-        }
+                UpdateOutcome.ReadyOnNextLaunch => "Update downloaded — it will be applied the next time you open SimpleText.",
+                UpdateOutcome.LaunchedInstaller => "Follow the App Installer prompt to finish updating.",
+                UpdateOutcome.NoUpdatePending => "No update is pending.",
+                _ => "Update failed. Please try again later.",
+            },
+            outcome == UpdateOutcome.Failed ? InfoBarSeverity.Error : InfoBarSeverity.Success,
+            autoHideSeconds: 10);
     }
 
     private void TrySetWindowIcon()
@@ -1197,14 +1177,9 @@ public sealed partial class MainWindow : Window
         Activated -= OnFirstActivated;
         ActivePane?.FocusEditor();
 
-        var update = await UpdateService.CheckForUpdatesAsync();
-        if (update.IsUpdateAvailable)
-        {
-            ShowInfoBar($"A new version ({update.Version}) is available!", 
-                InfoBarSeverity.Informational, 
-                "Update Now", 
-                update.DownloadUrl, 30);
-        }
+        var status = await _updateService.CheckForUpdatesAsync();
+        if (status.IsUpdateAvailable)
+            ShowUpdateBanner(status.Version);
     }
 
     private void OnWindowClosed(object sender, WindowEventArgs args)

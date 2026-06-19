@@ -9,69 +9,112 @@ using System.Threading;
 using System.Threading.Tasks;
 using SimpleText.Core.Updates;
 using Windows.ApplicationModel;
+using Windows.Foundation.Metadata;
+using Windows.Management.Deployment;
 
 namespace SimpleText.WinUI.Services;
 
 /// <summary>
-/// WinUI-specific update flow. Reads the running version from the MSIX package and delegates the
-/// GitHub query + version comparison to <see cref="UpdateChecker"/>, selecting the .msix that
-/// matches the machine architecture.
-///
-/// The <c>ms-appinstaller:</c> web protocol is disabled by default on current Windows (App
-/// Installer 1.21.3421.0+, the CVE-2021-43890 mitigation), so updates are applied the way
-/// Microsoft now prescribes: download the package, then open it with App Installer to update
-/// in place — no reliance on the protocol handler.
+/// MSIX implementation of <see cref="IUpdateService"/>. Checks GitHub Releases via
+/// <see cref="UpdateChecker"/>, then applies the update silently with <see cref="PackageManager"/>
+/// (deferred registration — the staged package registers on the next launch since the app is in
+/// use). Falls back to opening the downloaded .msix with App Installer when the silent API is
+/// unavailable (pre-Windows 10 2004) or fails; the ms-appinstaller: protocol is disabled by
+/// default, so launching the local file is the supported path.
 /// </summary>
-public static class UpdateService
+public sealed class UpdateService : IUpdateService
 {
-    public static async Task<UpdateInfo> CheckForUpdatesAsync()
+    private string? _pendingMsixUrl;
+
+    public async Task<UpdateStatus> CheckForUpdatesAsync(CancellationToken cancellationToken = default)
     {
         Version currentVersion;
         try
         {
-            var packageVersion = Package.Current.Id.Version;
-            currentVersion = new Version(packageVersion.Major, packageVersion.Minor, packageVersion.Build, packageVersion.Revision);
+            var v = Package.Current.Id.Version;
+            currentVersion = new Version(v.Major, v.Minor, v.Build, v.Revision);
         }
         catch
         {
             // Not running as an MSIX package (e.g. launched unpackaged from VS): no update channel.
-            return UpdateInfo.None;
+            return UpdateStatus.None;
         }
 
-        return await UpdateChecker.CheckForUpdatesAsync(currentVersion, SelectMsixAsset);
+        var info = await UpdateChecker.CheckForUpdatesAsync(currentVersion, SelectMsixAsset, cancellationToken);
+        _pendingMsixUrl = info.IsUpdateAvailable
+            && info.DownloadUrl.EndsWith(".msix", StringComparison.OrdinalIgnoreCase)
+                ? info.DownloadUrl
+                : null;
+
+        return info.IsUpdateAvailable ? new UpdateStatus(true, info.Version) : UpdateStatus.None;
     }
 
-    /// <summary>
-    /// Downloads the update .msix to a temp file and opens it with App Installer, which detects
-    /// the installed package and applies the in-place update. Returns the downloaded path;
-    /// throws on a network/IO failure.
-    /// </summary>
-    public static async Task<string> DownloadAndLaunchAsync(string msixUrl, CancellationToken cancellationToken = default)
+    public async Task<UpdateOutcome> ApplyPendingUpdateAsync(CancellationToken cancellationToken = default)
+    {
+        var url = _pendingMsixUrl;
+        if (string.IsNullOrEmpty(url))
+            return UpdateOutcome.NoUpdatePending;
+
+        try
+        {
+            var msixPath = await DownloadAsync(url, cancellationToken);
+
+            if (await TryStageSilentlyAsync(msixPath))
+                return UpdateOutcome.ReadyOnNextLaunch;
+
+            // Fallback: shell-execute the local package so App Installer applies the update.
+            Process.Start(new ProcessStartInfo { FileName = msixPath, UseShellExecute = true });
+            return UpdateOutcome.LaunchedInstaller;
+        }
+        catch
+        {
+            return UpdateOutcome.Failed;
+        }
+    }
+
+    // Silently stage the update via PackageManager; because the app is in use, registration is
+    // deferred to the next launch. Returns false when the API is missing (pre-19041) or the
+    // deployment reports an error, so the caller falls back to App Installer.
+    private static async Task<bool> TryStageSilentlyAsync(string msixPath)
+    {
+        if (!ApiInformation.IsMethodPresent("Windows.Management.Deployment.PackageManager", "AddPackageByUriAsync"))
+            return false;
+        try
+        {
+            var manager = new PackageManager();
+            var options = new AddPackageOptions
+            {
+                DeferRegistrationWhenPackagesAreInUse = true,
+                ForceAppShutdown = false,
+            };
+            var result = await manager.AddPackageByUriAsync(new Uri(msixPath), options);
+            return result.ExtendedErrorCode is null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static async Task<string> DownloadAsync(string msixUrl, CancellationToken cancellationToken)
     {
         var fileName = Path.GetFileName(new Uri(msixUrl).LocalPath);
         if (string.IsNullOrEmpty(fileName))
             fileName = "SimpleText-update.msix";
         var destination = Path.Combine(Path.GetTempPath(), fileName);
 
-        using (var client = new HttpClient())
-        {
-            client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SimpleText", "update"));
-            using var response = await client.GetAsync(msixUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            response.EnsureSuccessStatusCode();
-            using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var file = File.Create(destination);
-            await source.CopyToAsync(file, cancellationToken);
-        }
-
-        // Shell-executing a local .msix opens App Installer, which offers to update the running
-        // package — the supported path now that the ms-appinstaller: protocol is off by default.
-        Process.Start(new ProcessStartInfo { FileName = destination, UseShellExecute = true });
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("SimpleText", "update"));
+        using var response = await client.GetAsync(msixUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var file = File.Create(destination);
+        await source.CopyToAsync(file, cancellationToken);
         return destination;
     }
 
     // Pick the .msix matching this machine's architecture (the release ships x64 + arm64) and
-    // return its direct download URL; fall back to the first .msix, else (no selector match)
-    // UpdateChecker uses the release page.
+    // return its direct download URL; fall back to the first .msix.
     private static string? SelectMsixAsset(IReadOnlyList<ReleaseAsset> assets)
     {
         var arch = RuntimeInformation.OSArchitecture switch

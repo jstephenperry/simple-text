@@ -12,6 +12,7 @@ using SimpleText.Core.Elements;
 using SimpleText.Core.FileTypes;
 using SimpleText.Core.Session;
 using SimpleText.Core.Templates;
+using SimpleText.Core.Updates;
 
 namespace SimpleText.Avalonia.Views;
 
@@ -1097,33 +1098,36 @@ public partial class MainWindow : Window
     // --- Updates ---
 
     private Func<Task>? _bannerAction;
+    private readonly IUpdateService _updateService = new UpdateService();
 
     /// <summary>
-    /// Checks GitHub for a newer release via Velopack. A found update shows a banner whose
-    /// button downloads and applies it in place and restarts the app. The check fails silently
-    /// on network errors and is a no-op for non-installed builds. When <paramref name="userInitiated"/>
-    /// is true (Help &gt; Check for Updates) the "you're up to date" outcome is also reported so
-    /// the menu action always gives feedback.
+    /// Checks GitHub for a newer release. A found update shows a banner whose button stages the
+    /// update to apply on the next launch. The check fails silently on network errors and is a
+    /// no-op for non-installed builds. When <paramref name="userInitiated"/> is true (Help &gt;
+    /// Check for Updates) the "you're up to date" outcome is also reported so the menu action
+    /// always gives feedback.
     /// </summary>
     private async Task CheckForUpdatesAsync(bool userInitiated)
     {
-        var update = await UpdateService.CheckForUpdatesAsync();
+        var status = await _updateService.CheckForUpdatesAsync();
 
-        if (update != null)
-            ShowInfoBanner(
-                $"A new version ({update.TargetFullRelease.Version}) is available.",
-                actionText: "Restart & Update",
-                action: () => ApplyUpdateAsync(update));
+        if (status.IsUpdateAvailable)
+            ShowInfoBanner($"A new version ({status.Version}) is available.", actionText: "Update", action: ApplyUpdateAsync);
         else if (userInitiated)
             ShowInfoBanner("You are on the latest version.");
     }
 
-    private async Task ApplyUpdateAsync(global::Velopack.UpdateInfo update)
+    private async Task ApplyUpdateAsync()
     {
-        // DownloadAndApply restarts the app on success and never returns; swap the action for a
-        // progress message so the button can't be clicked twice mid-update.
-        ShowInfoBanner("Downloading update… the app will restart when it's ready.");
-        await UpdateService.DownloadAndApplyAsync(update);
+        ShowInfoBanner("Downloading update…");
+        var outcome = await _updateService.ApplyPendingUpdateAsync();
+        ShowInfoBanner(outcome switch
+        {
+            UpdateOutcome.ReadyOnNextLaunch => "Update downloaded — it will be applied the next time you open SimpleText.",
+            UpdateOutcome.LaunchedInstaller => "Follow the installer prompt to finish updating.",
+            UpdateOutcome.NoUpdatePending => "No update is pending.",
+            _ => "Update failed. Please try again later.",
+        });
     }
 
     private async void OnInfoBannerActionClick(object? sender, global::Avalonia.Interactivity.RoutedEventArgs e)
