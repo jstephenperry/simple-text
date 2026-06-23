@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <!--
-  Identity values are placeholders for local/sideload builds.
-    * For the Microsoft Store: replace Name, Publisher, and PublisherDisplayName
-      with the values Partner Center assigns when you reserve the app name, and
-      build with AppxPackageSigningEnabled=false (the Store signs the package).
-    * For sideload / direct-download builds: Publisher MUST exactly match the
-      subject of the code-signing certificate used to sign the package.
+  Identity values below are the LOCAL/self-signed defaults. Publisher MUST exactly match the
+  subject of the certificate used to sign the package, or Windows refuses it (0x8007000B):
+    * Local self-signed sideload: build/sign-msix.ps1 mints a cert with subject = this Publisher
+      (CN=SimpleText), so the two stay in sync automatically.
+    * Signed release (GitHub): release.yml stamps the real Azure Artifact Signing certificate
+      subject from the ARTIFACT_SIGNING_PUBLISHER secret into this attribute before packaging, so
+      the committed value here stays generic. Once released on a subject, keep it frozen — it is the
+      app's update identity (Publisher -> PublisherId -> PackageFamilyName).
+    * Microsoft Store: replace Name, Publisher, and PublisherDisplayName with the Partner Center
+      values and build with AppxPackageSigningEnabled=false (the Store signs the package).
 -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"

@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write       # create the release tag, the GitHub Release, and upload assets
+  id-token: write       # OIDC token for azure/login (Azure Artifact Signing); harmless for other jobs
 
 concurrency:
   group: release        # serialize releases so build-number-derived versions stay strictly increasing
@@ -62,6 +63,34 @@ jobs:
           echo "RELEASE_TAG=v$full" >> "$GITHUB_ENV"
           ./build/set-build-version.sh "$BuildNumber"
 
+      # MSIX identity is baked in at PACK time, and Windows requires the manifest <Identity Publisher>
+      # to EXACTLY equal the signing certificate's subject DN (same RDNs, same order, case-sensitive) —
+      # a mismatch fails signing/install with 0x8007000B. So stamp the real Azure Artifact Signing
+      # subject (from the ARTIFACT_SIGNING_PUBLISHER secret) into the manifest BEFORE building. The
+      # committed manifest keeps the generic CN=SimpleText for local self-signed sideload; this only
+      # rewrites it for the signed release build. Read the exact subject from your certificate profile
+      # in the Azure portal (Certificate profiles → <profile> → Subject name). See docs/msix-packaging.md.
+      #
+      # NOTE: Publisher is the app's update identity (Name + Publisher → PublisherId → PackageFamilyName).
+      # Once you ship a release on a given subject, keep it FROZEN — changing it later makes Windows treat
+      # the package as a different app, breaking in-place auto-update for existing installs.
+      - name: Stamp MSIX publisher (must equal the signing cert subject)
+        shell: pwsh
+        env:
+          MSIX_PUBLISHER: ${{ secrets.ARTIFACT_SIGNING_PUBLISHER }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:MSIX_PUBLISHER)) {
+            Write-Error "ARTIFACT_SIGNING_PUBLISHER secret is not set. Releases must be signed by Azure Artifact Signing; set this secret to the EXACT certificate subject DN from your certificate profile (e.g. 'CN=Your Org, O=Your Org, L=City, S=State, C=US'). See docs/msix-packaging.md."
+            exit 1
+          }
+          $manifest = (Resolve-Path "SimpleText.WinUI/Package.appxmanifest").Path
+          $doc = New-Object System.Xml.XmlDocument
+          $doc.PreserveWhitespace = $true            # keep the manifest formatting otherwise intact
+          $doc.Load($manifest)
+          $doc.Package.Identity.Publisher = $env:MSIX_PUBLISHER
+          $doc.Save($manifest)
+          Write-Host "Stamped MSIX Identity Publisher = $($doc.Package.Identity.Publisher)"
+
       - name: Download generated assets
         uses: actions/download-artifact@v4
         with:
@@ -73,37 +102,14 @@ jobs:
           dotnet restore "${{ env.Project }}" -p:Platform=x64
           dotnet restore "${{ env.Project }}" -p:Platform=ARM64
 
-      # Build both architectures with one certificate so a single trust covers them.
-      # Uses the provided code-signing cert if SIGNING_CERTIFICATE_BASE64 is set;
-      # otherwise generates a self-signed test cert (CN must match the manifest Publisher)
-      # so the package is always signed. For Store submission, sign disabled + .msixupload.
-      - name: Build + sign
+      # Build both architectures UNSIGNED. Azure Artifact Signing applies the only signature later
+      # (the "Sign MSIX" step below), so msbuild must NOT sign here: AppxPackageSigningEnabled=false
+      # and no PackageCertificate* properties. For Store submission instead, use
+      # UapAppxPackageBuildMode=StoreUpload with signing disabled and upload the .msixupload.
+      - name: Build MSIX (unsigned, x64 + ARM64)
         shell: pwsh
-        env:
-          PFX_B64: ${{ secrets.SIGNING_CERTIFICATE_BASE64 }}
-          PFX_PWD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
         run: |
           New-Item -ItemType Directory -Force -Path "${{ env.PackageDir }}" | Out-Null
-          $pfx = "$env:RUNNER_TEMP\sign.pfx"
-          if ($env:PFX_B64) {
-            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:PFX_B64))
-            $pw = $env:PFX_PWD
-            $cert = Get-PfxCertificate -FilePath $pfx -Password (ConvertTo-SecureString $pw -AsPlainText -Force)
-            Write-Host "Signing with the provided code-signing certificate."
-          } else {
-            $pw = [guid]::NewGuid().ToString('N')
-            $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=SimpleText" `
-              -FriendlyName "SimpleText CI (self-signed)" `
-              -CertStoreLocation "Cert:\CurrentUser\My" `
-              -NotAfter (Get-Date).AddYears(5)
-            $sec = ConvertTo-SecureString -String $pw -Force -AsPlainText
-            Export-PfxCertificate -Cert $cert -FilePath $pfx -Password $sec | Out-Null
-            Write-Warning "No SIGNING_CERTIFICATE_BASE64 secret set; used a self-signed certificate. Users must trust SimpleText.cer (build/trust-cert.ps1) before installing."
-          }
-
-          # Ship the public cert so users can trust the publisher (build/trust-cert.ps1).
-          Export-Certificate -Cert $cert -FilePath "${{ env.PackageDir }}\SimpleText.cer" | Out-Null
-
           foreach ($p in @('x64','ARM64')) {
             msbuild "${{ env.Project }}" `
               /p:Configuration=Release `
@@ -113,9 +119,7 @@ jobs:
               /p:AppxPackageDir="${{ env.PackageDir }}\" `
               /p:UapAppxPackageBuildMode=SideloadOnly `
               /p:AppxBundle=Never `
-              /p:AppxPackageSigningEnabled=true `
-              /p:PackageCertificateKeyFile="$pfx" `
-              /p:PackageCertificatePassword="$pw"
+              /p:AppxPackageSigningEnabled=false
           }
 
       - name: Collect release files
@@ -123,13 +127,43 @@ jobs:
         run: |
           $dest = "$env:RUNNER_TEMP\release"
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
-          Get-ChildItem -Recurse "${{ env.PackageDir }}" -Include *.msix,*.cer |
+          Get-ChildItem -Recurse "${{ env.PackageDir }}" -Include *.msix |
             ForEach-Object { Copy-Item $_.FullName -Destination $dest }
           Get-ChildItem $dest
 
+      # Sign the produced .msix files with Azure Artifact Signing (formerly "Trusted Signing").
+      # Its certificate chains to a Microsoft public root that is trusted out of the box, so the
+      # signed package installs with no per-machine trust step and the in-app WinUI updater's silent
+      # PackageManager.AddPackageByUriAsync staging path works on any machine. Auth is OIDC: this
+      # azure/login step exchanges the workflow's id-token (see permissions above) for Azure creds
+      # that the signing action reads via DefaultAzureCredential. The app registration needs a GitHub
+      # federated credential and the "Artifact Signing Certificate Profile Signer" role on the profile.
+      - name: Azure login (OIDC)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Action renamed from azure/trusted-signing-action when the service was rebranded "Artifact
+      # Signing" (early 2026); pin @v2. Certs are valid ~3 days, so RFC3161 timestamping is mandatory
+      # (defaults shown explicitly). `endpoint` MUST match the region of your account/profile, or
+      # signing fails with 403. Verify input names against the action README for the tag you pin.
+      - name: Sign MSIX (Azure Artifact Signing)
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ secrets.ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.ARTIFACT_SIGNING_PROFILE }}
+          files-folder: ${{ runner.temp }}\release
+          files-folder-filter: msix
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
       # Create the release tag (vX.Y.Z.<build>) at the current commit and publish the Release with the
-      # MSIX assets. action-gh-release creates the tag if it doesn't exist; pack-avalonia then appends
-      # its installers to this same tag's release.
+      # signed MSIX assets. action-gh-release creates the tag if it doesn't exist; pack-avalonia then
+      # appends its installers to this same tag's release.
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -140,10 +174,15 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
 
-  # Cross-platform Avalonia installers + in-app auto-update feed, built with Velopack and
-  # attached to the same GitHub Release. Each OS packs its own channel (win/osx/linux) that
-  # the app's UpdateManager reads; the release object is created first by the MSIX `build`
-  # job (so notes exist), and these jobs append their assets.
+  # Avalonia installers + in-app auto-update feed, built with Velopack and attached to the same
+  # GitHub Release. Each OS packs its own channel (win/linux) that the app's UpdateManager reads;
+  # the release object is created first by the MSIX `build` job (so notes exist), and these jobs
+  # append their assets.
+  #
+  # macOS is intentionally excluded: Velopack updates on macOS require an Apple Developer ID
+  # signature + notarization (Gatekeeper quarantines unsigned downloaded updates and refuses to
+  # launch them), which this project doesn't set up. Shipping an unsigned osx channel would be a
+  # broken auto-updater, so mac users build from source. See docs/msix-packaging.md / README.
   pack-avalonia:
     name: Pack Avalonia (${{ matrix.rid }})
     needs: build
@@ -156,9 +195,6 @@ jobs:
           - os: windows-latest
             rid: win-x64
             mainExe: SimpleText.Avalonia.exe
-          - os: macos-latest
-            rid: osx-arm64
-            mainExe: SimpleText.Avalonia
           - os: ubuntu-latest
             rid: linux-x64
             mainExe: SimpleText.Avalonia

@@ -26,7 +26,7 @@ highlighting and Find).
 - **SimpleText.Avalonia** — Cross-platform (Windows/macOS/Linux), built on [Avalonia UI](https://avaloniaui.net/) with [AvaloniaEdit](https://github.com/AvaloniaUI/AvaloniaEdit) and TextMate grammars. The editor renders in the bundled monospace [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (OFL) so source tables line up identically on every OS, regardless of installed fonts
 - **SimpleText.Core** — Shared library (session management, file types, search, templates, and the semantic highlighting engine: Markdig + TextMate span parsers behind a UI-agnostic `ISpanHighlighter`)
 
-Both frontends share the same feature set: Notepad++-style tabbed editing, multi-tab session restore, light/dark/system themes, word wrap, zoom, and a consistent in-app updater (**Help → Check for Updates**). Both implement one shared `IUpdateService` contract (in `SimpleText.Core`) with an identical check → notify → apply flow: check GitHub Releases, then stage the update silently so it applies on the next launch. The WinUI build updates the MSIX in place (`PackageManager`, falling back to App Installer); the Avalonia build uses [Velopack](https://velopack.io) across Windows/macOS/Linux.
+Both frontends share the same feature set: Notepad++-style tabbed editing, multi-tab session restore, light/dark/system themes, word wrap, zoom, and a consistent in-app updater (**Help → Check for Updates**). Both implement one shared `IUpdateService` contract (in `SimpleText.Core`) with an identical check → notify → apply flow: check GitHub Releases, then stage the update silently so it applies on the next launch. The WinUI build updates the MSIX in place (`PackageManager`, falling back to App Installer); the Avalonia build uses [Velopack](https://velopack.io) on **Windows and Linux**. macOS auto-update is **not supported** (it needs Apple notarization — see [below](#auto-update-support-by-platform)).
 
 ## Building
 
@@ -40,8 +40,8 @@ dotnet run   --project SimpleText.Avalonia/SimpleText.Avalonia.csproj
 
 #### Avalonia installers (Velopack)
 
-Released builds are packaged with [Velopack](https://velopack.io) into per-OS installers
-(Windows `Setup.exe`, macOS `.app`, Linux `.AppImage`) plus an update feed, so the installed
+Released builds are packaged with [Velopack](https://velopack.io) into installers for
+**Windows** (`Setup.exe`) and **Linux** (`.AppImage`) plus an update feed, so the installed
 app can update itself in place. CI does this when the release workflow is run — see the
 `pack-avalonia` job in [`.github/workflows/release.yml`](.github/workflows/release.yml). To build one locally:
 ```
@@ -49,8 +49,17 @@ dotnet tool install -g vpk                          # Velopack CLI (Linux also n
 dotnet publish SimpleText.Avalonia/SimpleText.Avalonia.csproj -c Release -r linux-x64 --self-contained -o publish
 vpk pack -u SimpleText.Avalonia -v 1.0.1 -p publish -e SimpleText.Avalonia -o vpk-release
 ```
-Installers are unsigned (matching the WinUI self-signed MSIX), so macOS Gatekeeper and Windows
-SmartScreen will warn until the package is trusted.
+The Velopack **Windows** installer is unsigned, so SmartScreen warns until reputation builds
+(the signed WinUI **MSIX** is the trusted Windows path). The **Linux** AppImage has no equivalent
+trust gate.
+
+##### Auto-update support by platform
+
+| Platform | Distribution | In-app auto-update |
+| --- | --- | --- |
+| Windows | WinUI MSIX (signed, Artifact Signing) **+** Avalonia Velopack | ✅ Yes |
+| Linux | Avalonia Velopack `.AppImage` (x64) | ✅ Yes (run the installed AppImage) |
+| macOS | Build from source | ❌ Not supported — needs an Apple Developer ID signature + notarization, or Gatekeeper blocks downloaded updates. Enable later via `vpk pack --signAppIdentity … --notaryProfile …`. |
 
 ### WinUI 3 (packaged MSIX, Windows only)
 
@@ -65,33 +74,30 @@ msbuild SimpleText.WinUI/SimpleText.WinUI.csproj /p:Configuration=Release /p:Pla
   /p:GenerateAppxPackageOnBuild=true /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false
 ```
 
-#### Installing without the "this app may harm your computer" warning
+#### Installing a local build without the "this app may harm your computer" warning
 
-A self-signed MSIX still warns until its certificate is **trusted on your PC** —
-that one-time, free step is what removes the warning. From a *Developer
-PowerShell for VS*:
+Downloaded [Releases](../../releases) need none of this — they're signed by
+[Azure Artifact Signing](https://learn.microsoft.com/azure/artifact-signing/),
+whose root Windows already trusts, so they install (and auto-update) with no
+warning and no setup. This only applies to **locally self-signed** builds.
+
+A self-signed MSIX warns until its certificate is **trusted on your PC** — that
+one-time, free step removes the warning. From a *Developer PowerShell for VS*:
 
 ```powershell
 pwsh build/sign-msix.ps1 -Trust          # build + self-sign + trust (UAC prompt)
 Add-AppxPackage .\AppPackages\...\SimpleText.Editor_*.msix   # or double-click it
 ```
 
-Installing a downloaded [Release](../../releases) instead? Trust its certificate once:
-
-```powershell
-pwsh build/trust-cert.ps1 -Path .\SimpleText.cer
-Add-AppxPackage .\SimpleText.Editor_1.0.1.0_x64.msix
-```
-
-The cert is reused across builds, so you only trust it once. For zero per-machine
-setup (e.g. distributing to others), use a CA-issued cert such as
-[Azure Trusted Signing](https://learn.microsoft.com/azure/trusted-signing/)
-instead. Details: [`docs/msix-packaging.md`](docs/msix-packaging.md#why-a-self-signed-package-warns--and-how-to-stop-it).
+The cert is reused across builds, so you only trust it once. To install a
+self-signed build on **another of your machines**, copy its `.cer` and run
+`pwsh build/trust-cert.ps1 -Path .\SimpleText.cer` there first. Details:
+[`docs/msix-packaging.md`](docs/msix-packaging.md#why-a-self-signed-local-package-warns--and-how-to-stop-it).
 
 CI/CD builds this for you: see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 (PR/branch build checks) and [`.github/workflows/release.yml`](.github/workflows/release.yml)
-(run the workflow → signed, build-versioned packages on a GitHub Release). Packaging and
-storage details are in [`docs/msix-packaging.md`](docs/msix-packaging.md).
+(run the workflow → Artifact-signed, build-versioned packages on a GitHub Release). Packaging,
+signing secrets, and storage details are in [`docs/msix-packaging.md`](docs/msix-packaging.md).
 
 ### Versioning
 
