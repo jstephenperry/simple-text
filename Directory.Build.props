@@ -1,12 +1,30 @@
 <Project>
 
-  <!-- Single source of truth for the application version (3-part SemVer), read from version.txt.
-       Bump it with build/bump-version.sh, which also syncs the WinUI MSIX manifest's required
-       4-part Identity version. Every .NET project picks this up as <Version>; the Avalonia
+  <!-- Single source of truth for the application's semantic version (3-part SemVer), read from
+       version.txt. Bump it with build/bump-version.sh, which also syncs the WinUI MSIX manifest's
+       required 4-part Identity version. Every .NET project picks this up as <Version>; the Avalonia
        assembly/Velopack release and the WinUI assembly all derive from the same file. -->
   <PropertyGroup>
     <SimpleTextVersion>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)version.txt').Trim())</SimpleTextVersion>
+
+    <!-- Auto-incrementing build number: the 4th version component. CI passes the workflow's
+         monotonically increasing run number (-p:BuildNumber=${{ github.run_number }}); local builds
+         default to 0. This stamps a unique, ever-increasing build version into every CI build without
+         touching the committed semantic version in version.txt. build/set-build-version.sh writes the
+         same number into the MSIX manifest's 4-part Identity (the only project file with a literal
+         version), so all artifacts of a build agree. -->
+    <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+
+    <!-- NuGet/SemVer package identity stays 3-part; assembly binding identity stays stable across
+         builds of the same semantic version (only major.minor.0.0 to avoid binding churn). -->
     <Version>$(SimpleTextVersion)</Version>
+    <AssemblyVersion>$(SimpleTextVersion).0</AssemblyVersion>
+
+    <!-- Win32 file version and the human-readable informational version carry the build number, so
+         each CI build is uniquely identifiable (Details tab on Windows, AssemblyInformationalVersion
+         at runtime). -->
+    <FileVersion>$(SimpleTextVersion).$(BuildNumber)</FileVersion>
+    <InformationalVersion>$(SimpleTextVersion)+build.$(BuildNumber)</InformationalVersion>
   </PropertyGroup>
 
 </Project>

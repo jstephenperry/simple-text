@@ -123,8 +123,12 @@ pwsh build/sign-msix.ps1 -ExportPfx .\SimpleText.pfx   # prints base64 + passwor
   build, an `assets` job that renders the visual assets on Linux, and the real
   check — building the packaged MSIX **unsigned** on Windows for `x64` and
   `ARM64`. The Avalonia frontend is intentionally excluded.
-- **`release.yml`** (tag `v*`): renders assets, builds **signed** `x64` + `ARM64`
-  packages with one certificate, and publishes them to a GitHub Release.
+- **`release.yml`** (manual **Run workflow**): renders assets, builds **signed**
+  `x64` + `ARM64` packages with one certificate, and publishes them to a GitHub
+  Release. It stamps an auto-incrementing build number (the workflow run number)
+  as the 4th version component, so the release is tagged `vX.Y.Z.<build>` and the
+  MSIX Identity, Velopack package, and git tag all carry that same version — which
+  is what the in-app updaters compare against. See [Versioning](../README.md#versioning).
 
 ## Not done / follow-ups
 

@@ -42,8 +42,8 @@ dotnet run   --project SimpleText.Avalonia/SimpleText.Avalonia.csproj
 
 Released builds are packaged with [Velopack](https://velopack.io) into per-OS installers
 (Windows `Setup.exe`, macOS `.app`, Linux `.AppImage`) plus an update feed, so the installed
-app can update itself in place. CI does this on tag `v*` — see the `pack-avalonia` job in
-[`.github/workflows/release.yml`](.github/workflows/release.yml). To build one locally:
+app can update itself in place. CI does this when the release workflow is run — see the
+`pack-avalonia` job in [`.github/workflows/release.yml`](.github/workflows/release.yml). To build one locally:
 ```
 dotnet tool install -g vpk                          # Velopack CLI (Linux also needs squashfs-tools)
 dotnet publish SimpleText.Avalonia/SimpleText.Avalonia.csproj -c Release -r linux-x64 --self-contained -o publish
@@ -90,26 +90,45 @@ instead. Details: [`docs/msix-packaging.md`](docs/msix-packaging.md#why-a-self-s
 
 CI/CD builds this for you: see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 (PR/branch build checks) and [`.github/workflows/release.yml`](.github/workflows/release.yml)
-(tag `v*` → signed packages on a GitHub Release). Packaging and storage details
-are in [`docs/msix-packaging.md`](docs/msix-packaging.md).
+(run the workflow → signed, build-versioned packages on a GitHub Release). Packaging and
+storage details are in [`docs/msix-packaging.md`](docs/msix-packaging.md).
 
 ### Versioning
 
-There is one source of truth for the version: **`version.txt`** at the repo root (3-part
-SemVer, e.g. `1.0.1`). Every .NET project reads it via [`Directory.Build.props`](Directory.Build.props),
-and the Avalonia/Velopack release packs from it. Windows requires a 4-part package version, so
-the WinUI MSIX manifest carries `version.txt + ".0"` (e.g. `1.0.1.0`).
+The version has two parts: a **semantic** part you manage by hand and an **auto-incrementing build
+number** that CI stamps on every build.
 
-Bump the version with the helper, which increments `version.txt` **and** syncs the manifest:
+- **`version.txt`** at the repo root is the single source of truth for the 3-part semantic version
+  (e.g. `1.0.1`). Every .NET project reads it via [`Directory.Build.props`](Directory.Build.props).
+  Bump it with the helper, which increments `version.txt` **and** syncs the WinUI MSIX manifest's
+  required 4-part Identity version:
 
-```
-build/bump-version.sh            # patch: 1.0.1 -> 1.0.2
-build/bump-version.sh minor      # 1.0.2 -> 1.1.0
-build/bump-version.sh set 2.0.0  # explicit
-```
+  ```
+  build/bump-version.sh            # patch: 1.0.1 -> 1.0.2
+  build/bump-version.sh minor      # 1.0.2 -> 1.1.0
+  build/bump-version.sh set 2.0.0  # explicit
+  ```
 
-CI (`version-check`) fails if the manifest ever drifts from `version.txt`. To cut a release,
-bump, commit, then tag `v<version>.0` (e.g. `v1.0.2.0`) and push the tag.
+- **Build number** — the 4th version component. CI passes the workflow run number as
+  `-p:BuildNumber=<n>`; local builds default to `0`. It becomes the assembly `FileVersion` /
+  `InformationalVersion` and, for releases, the MSIX Identity and Velopack package version.
+  `version.txt` is never edited for it, so the committed manifest stays at `version.txt + ".0"`
+  (e.g. `1.0.1.0`) and CI (`version-check`) still fails if the manifest drifts from `version.txt`.
+
+[`build/set-build-version.sh <n>`](build/set-build-version.sh) stamps the build number into the
+only file with a literal version (the MSIX manifest's 4-part Identity); the .NET projects pick it up
+from `-p:BuildNumber` and need no edit.
+
+**Cutting a release.** Releases are produced by **running the release workflow** (Actions →
+*Release MSIX* → *Run workflow*, on the commit to release), **not** by pushing a hand-made tag — the
+build number isn't known until the run starts. The workflow computes the full version
+`version.txt.<build>`, stamps it into the MSIX manifest and the Velopack package, and publishes a
+GitHub Release tagged `v<version>.<build>` (e.g. `v1.0.1.42`). Because the git tag, the MSIX Identity,
+the Velopack package version, and the app's reported version are all that same number, both in-app
+updaters detect new releases correctly: the WinUI build compares the release **tag** to its installed
+MSIX version, and the Avalonia build compares Velopack **package** versions from the release feed —
+and each release is strictly newer than the last even without a `version.txt` bump. To also move the
+semantic part, run `build/bump-version.sh` and commit before releasing.
 
 ## Disclaimer
 
