@@ -9,7 +9,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using SimpleText.Core.Updates;
 using Windows.ApplicationModel;
-using Windows.Foundation.Metadata;
 using Windows.Management.Deployment;
 
 namespace SimpleText.WinUI.Services;
@@ -77,7 +76,7 @@ public sealed class UpdateService : IUpdateService
     // deployment reports an error, so the caller falls back to App Installer.
     private static async Task<bool> TryStageSilentlyAsync(string msixPath)
     {
-        if (!ApiInformation.IsMethodPresent("Windows.Management.Deployment.PackageManager", "AddPackageByUriAsync"))
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
             return false;
         try
         {

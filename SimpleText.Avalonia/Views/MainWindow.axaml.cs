@@ -513,7 +513,7 @@ public partial class MainWindow : Window
 
             var parts = categoryPath.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
             
-            MenuItem currentMenu = null;
+            MenuItem? currentMenu = null;
             string currentPath = "";
             
             foreach (var part in parts)
@@ -533,7 +533,8 @@ public partial class MainWindow : Window
                 currentMenu = subMenu;
             }
             
-            return currentMenu;
+            // A category path always yields at least one node, so currentMenu is non-null here.
+            return currentMenu!;
         }
 
         foreach (var group in TemplateCatalog.Shared.All.GroupBy(t => t.Category))
